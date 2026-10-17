@@ -8,6 +8,9 @@ pub enum SovereignError {
     #[error("Encryption or decryption failed")]
     CipherError,
 
+    #[error("Cryptographic operation failed: {0}")]
+    CryptoError(String),
+
     #[error("Threshold signature or key shares insufficient (required {required}, got {provided})")]
     InsufficientThresholdShares { required: usize, provided: usize },
 

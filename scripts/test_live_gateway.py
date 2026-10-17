@@ -115,7 +115,7 @@ def main():
         print(f"      Order created: {order_resp['order_id']}, Total: INR {order_resp['total_amount_inr']}")
         print(f"      UPI Intent: {order_resp['upi_uri']}")
 
-    print("[5/5] Testing DPDP Act Section 12 Right-to-Erasure Crypto-Shredding...")
+    print("[5/6] Testing DPDP Act Section 12 Right-to-Erasure Crypto-Shredding...")
     shred_req_data = json.dumps({
         "did": test_did,
         "timestamp": 1776000500
@@ -144,6 +144,75 @@ def main():
         assert prob["title"] == "Identity Not Found"
         assert prob["jurisdiction"] == "INDIA_MUMBAI_BLR"
         print(f"      Post-shred RFC 7807 response confirmed: 404 {prob['title']}")
+
+    print("[6/6] Testing Real-Time Delivery Receipts, Presence & Typing APIs...")
+    # 1. Delivery Receipt - Sent (Single Tick)
+    receipt_data = json.dumps({
+        "action": "sent",
+        "message_id": "msg_live_rt_101",
+        "sender_did": "did:bharat:alice_live",
+        "recipient_did": "did:bharat:bob_live",
+        "timestamp": 1776000000
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/realtime/receipt", data=receipt_data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        rec = json.loads(resp.read().decode())
+        assert rec["status"] == "Sent"
+        assert rec["blue_ticks"] is False
+        print("      Receipt Sent: 1 Grey Tick (Single Tick)")
+
+    # 2. Delivery Receipt - Delivered (Double Tick)
+    receipt_data = json.dumps({
+        "action": "delivered",
+        "message_id": "msg_live_rt_101",
+        "timestamp": 1776000001
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/realtime/receipt", data=receipt_data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        rec = json.loads(resp.read().decode())
+        assert rec["status"] == "Delivered"
+        assert rec["blue_ticks"] is False
+        print("      Receipt Delivered: 2 Grey Ticks (Double Tick)")
+
+    # 3. Delivery Receipt - Read (Blue Double Tick)
+    receipt_data = json.dumps({
+        "action": "read",
+        "message_id": "msg_live_rt_101",
+        "reader_did": "did:bharat:bob_live",
+        "timestamp": 1776000002
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/realtime/receipt", data=receipt_data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        rec = json.loads(resp.read().decode())
+        assert rec["status"] == "Read"
+        assert rec["blue_ticks"] is True
+        print("      Receipt Read: 2 Blue Ticks (Read Receipt Verified)")
+
+    # 4. Presence Update
+    presence_data = json.dumps({
+        "user_did": "did:bharat:alice_live",
+        "is_online": True,
+        "timestamp": 1776000000,
+        "policy": "Everyone"
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/realtime/presence", data=presence_data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        pres = json.loads(resp.read().decode())
+        assert pres["status"] == "ONLINE"
+        print("      Presence Update: ONLINE (Everyone Policy)")
+
+    # 5. Typing Indicator
+    typing_data = json.dumps({
+        "chat_id": "chat_live_surat",
+        "user_did": "did:bharat:alice_live",
+        "is_typing": True,
+        "timestamp": 1776000000
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/realtime/typing", data=typing_data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        typ = json.loads(resp.read().decode())
+        assert typ["is_typing"] is True
+        print("      Typing Indicator: ACTIVE (Broadcasting to chat members)")
 
     print("\n[SUCCESS] Live Gateway Daemon network test passed with 100% fidelity!")
     proc.terminate()

@@ -25,13 +25,13 @@ services:
     image: sovereign/relay-node:latest
     container_name: sovereign-relay-mesh
     environment:
-      - RELAY_LISTEN_PORT=8080
+      - RELAY_LISTEN_PORT=8081
       - EPHEMERAL_TTL_SECONDS=604800 # 7 days max memory buffer
       - ZERO_DISK_RETENTION=true
       - RULE_4_2_ENVELOPE_ENFORCEMENT=strict
       - CONSORTIUM_RPC_URL=ws://consortium-validator:9944
     ports:
-      - "8080:8080"
+      - "8081:8081"
     restart: unless-stopped
     networks:
       - sovereign-internal
@@ -67,6 +67,25 @@ services:
       - "8443:8443"
       - "40000-40100:40000-40100/udp"
     restart: unless-stopped
+    networks:
+      - sovereign-internal
+
+  # 5. OpenAPI 3.1 & Realtime Gateway (Tokio HTTP/1.1 & WebSocket daemon)
+  sovereign-gateway:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.gateway
+    container_name: sovereign-gateway-api
+    environment:
+      - SOVEREIGN_HOST=0.0.0.0
+      - SOVEREIGN_PORT=8080
+      - DATA_JURISDICTION=INDIA_LOCALIZED_MUMBAI_BLR
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      - ephemeral-relay
+      - storage-node
     networks:
       - sovereign-internal
 

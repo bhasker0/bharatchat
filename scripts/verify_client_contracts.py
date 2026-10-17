@@ -74,6 +74,13 @@ def verify_openapi_client_contract():
     assert "smk_zeroized" in gateway_src
     print("      [OK] Verified DPDP Act Section 12 Crypto-Shredding state parity")
 
+    # Check Realtime Delivery Receipts & Privacy Controls
+    assert "record_sent" in gateway_src
+    assert "record_delivered" in gateway_src
+    assert "record_read" in gateway_src
+    assert "hasReadReceipt" in chat_src
+    print("      [OK] Verified Realtime Tick Receipts (Sent / Delivered / Read) parity")
+
 def verify_statutory_and_ui_tokens():
     print("[3/3] Verifying Statutory Identifiers and Design Tokens...")
     theme_path = "/home/bhasker-savaliya/hola/client/lib/core/theme/app_theme.dart"

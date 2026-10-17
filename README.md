@@ -58,7 +58,8 @@ graph TD
 ## 2. Core Pillars & Feature Parity
 
 ### WhatsApp Feature Parity
-- **Messaging**: Markdown text formatting, edit & delete within time limits, disappearing messages (24h/7d/90d), view-once media, audio voice notes with variable playback rates.
+- **Messaging & Double Ratchet**: Signal Protocol Double Ratchet (FS + PCS) with out-of-order recovery for direct 1-to-1 chats, markdown text formatting, edit & delete within time limits, disappearing messages (24h/7d/90d), view-once media, audio voice notes with variable playback rates.
+- **Real-Time Delivery Receipts & Presence**: WhatsApp-style delivery ticks (1 grey tick = Sent, 2 grey ticks = Delivered, 2 blue ticks = Read), ephemeral typing indicators, and presence tracking with DPDP Section 6 privacy controls.
 - **Calls & Screen Sharing**: WebRTC Secure Frame (SFrame RFC 9605) E2EE voice and video calls supporting up to 32 participants simultaneously with dynamic MLS key rotation.
 - **Communities & Large Groups**: TreeKEM Message Layer Security (RFC 9420) scaling to **1,024+ members** in $O(\log N)$ time, featuring Admin-only Announcements and decentralized Topic Discussion channels.
 - **Multi-Device Sync**: Companion Mode (SESAME Protocol) enabling QR-code ECDH pairing for Desktop and Web without exporting primary device private keys.
@@ -130,7 +131,7 @@ Executed on release profile (`cargo run --release -p sovereign-bench`):
 
 ## 5. Quick Start Guide
 
-### 1. Run Workspace Automated Tests (27 Tests)
+### 1. Run Workspace Automated Tests (33 Tests)
 ```bash
 cargo test --workspace
 ```

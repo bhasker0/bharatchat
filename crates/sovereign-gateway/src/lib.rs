@@ -77,14 +77,18 @@ impl HttpResponse {
     }
 }
 
+pub mod realtime;
+
 pub struct GatewayEngine {
     pub env: Arc<SovereignAppEnvironment>,
+    pub realtime: Arc<realtime::RealtimeManager>,
 }
 
 impl GatewayEngine {
     pub fn new() -> Self {
         Self {
             env: Arc::new(SovereignAppEnvironment::new()),
+            realtime: Arc::new(realtime::RealtimeManager::new()),
         }
     }
 
@@ -433,6 +437,104 @@ impl GatewayEngine {
                         "/api/v1/compliance/shred",
                     ),
                 }
+            }
+            ("POST", "/api/v1/realtime/receipt") => {
+                #[derive(Deserialize)]
+                struct ReceiptReq {
+                    action: String,
+                    message_id: String,
+                    #[serde(default)]
+                    sender_did: Option<String>,
+                    #[serde(default)]
+                    recipient_did: Option<String>,
+                    #[serde(default)]
+                    reader_did: Option<String>,
+                    timestamp: u64,
+                }
+                match serde_json::from_str::<ReceiptReq>(body) {
+                    Ok(req) => match req.action.as_str() {
+                        "sent" => {
+                            let s = req.sender_did.unwrap_or_default();
+                            let r = req.recipient_did.unwrap_or_default();
+                            let ev = self.realtime.record_sent(&req.message_id, &s, &r, req.timestamp);
+                            HttpResponse::ok(serde_json::to_value(&ev).unwrap_or_default())
+                        }
+                        "delivered" => {
+                            if let Some(ev) = self.realtime.record_delivered(&req.message_id, req.timestamp) {
+                                HttpResponse::ok(serde_json::to_value(&ev).unwrap_or_default())
+                            } else {
+                                HttpResponse::problem(404, "Message Not Found", "Cannot mark non-existent message delivered", path)
+                            }
+                        }
+                        "read" => {
+                            let reader = req.reader_did.unwrap_or_default();
+                            if let Some(ev) = self.realtime.record_read(&req.message_id, &reader, req.timestamp) {
+                                HttpResponse::ok(serde_json::to_value(&ev).unwrap_or_default())
+                            } else {
+                                HttpResponse::problem(404, "Message Not Found", "Cannot mark non-existent message read", path)
+                            }
+                        }
+                        _ => HttpResponse::problem(400, "Invalid Action", "Action must be sent, delivered, or read", path),
+                    },
+                    Err(e) => HttpResponse::problem(400, "Invalid Receipt Request", &e.to_string(), path),
+                }
+            }
+            ("POST", "/api/v1/realtime/presence") => {
+                #[derive(Deserialize)]
+                struct PresenceReq {
+                    user_did: String,
+                    is_online: bool,
+                    timestamp: u64,
+                    #[serde(default = "default_policy")]
+                    policy: String,
+                }
+                fn default_policy() -> String { "Everyone".to_string() }
+                match serde_json::from_str::<PresenceReq>(body) {
+                    Ok(req) => {
+                        let policy = match req.policy.as_str() {
+                            "Nobody" => realtime::LastSeenPolicy::Nobody,
+                            "ContactsOnly" => realtime::LastSeenPolicy::ContactsOnly,
+                            _ => realtime::LastSeenPolicy::Everyone,
+                        };
+                        self.realtime.update_presence(&req.user_did, req.is_online, req.timestamp, policy);
+                        HttpResponse::ok(serde_json::json!({
+                            "user_did": req.user_did,
+                            "status": if req.is_online { "ONLINE" } else { "OFFLINE" },
+                            "policy": req.policy,
+                            "timestamp": req.timestamp
+                        }))
+                    }
+                    Err(e) => HttpResponse::problem(400, "Invalid Presence Request", &e.to_string(), path),
+                }
+            }
+            ("POST", "/api/v1/realtime/typing") => {
+                #[derive(Deserialize)]
+                struct TypingReq {
+                    chat_id: String,
+                    user_did: String,
+                    is_typing: bool,
+                    timestamp: u64,
+                }
+                match serde_json::from_str::<TypingReq>(body) {
+                    Ok(req) => {
+                        self.realtime.set_typing(&req.chat_id, &req.user_did, req.is_typing, req.timestamp);
+                        HttpResponse::ok(serde_json::json!({
+                            "chat_id": req.chat_id,
+                            "user_did": req.user_did,
+                            "is_typing": req.is_typing,
+                            "timestamp": req.timestamp
+                        }))
+                    }
+                    Err(e) => HttpResponse::problem(400, "Invalid Typing Request", &e.to_string(), path),
+                }
+            }
+            ("GET", p) if p.starts_with("/api/v1/realtime/typing/") => {
+                let chat_id = &p["/api/v1/realtime/typing/".len()..];
+                let typers = self.realtime.get_active_typers(chat_id, 1776000000);
+                HttpResponse::ok(serde_json::json!({
+                    "chat_id": chat_id,
+                    "active_typers": typers
+                }))
             }
             _ => HttpResponse::problem(
                 404,

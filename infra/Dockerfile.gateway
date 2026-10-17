@@ -1,0 +1,48 @@
+# Multi-Stage Production Dockerfile for BharatChat Sovereign Gateway
+# ------------------------------------------------------------------
+# Stage 1: Build Environment
+FROM rust:1.80-slim-bookworm as builder
+
+WORKDIR /usr/src/app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace manifests
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+
+# Build release binary for sovereign-gateway
+RUN cargo build --release -p sovereign-gateway --bin sovereign-gateway
+
+# ------------------------------------------------------------------
+# Stage 2: Distroless/Minimal Runtime
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create unprivileged service user
+RUN useradd -m -u 1000 -s /bin/bash sovereign
+
+# Copy binary from builder
+COPY --from=builder /usr/src/app/target/release/sovereign-gateway /usr/local/bin/sovereign-gateway
+
+USER sovereign
+WORKDIR /home/sovereign
+
+ENV SOVEREIGN_HOST="0.0.0.0"
+ENV SOVEREIGN_PORT="8080"
+ENV DATA_JURISDICTION="INDIA_LOCALIZED_MUMBAI_BLR"
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/sovereign-gateway"]

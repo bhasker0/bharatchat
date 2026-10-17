@@ -31,13 +31,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let gw = Arc::clone(&gateway);
         tokio::spawn(async move {
-            let mut buf = [0u8; 65536];
-            let n = match socket.read(&mut buf).await {
-                Ok(n) if n > 0 => n,
-                _ => return,
+            let mut received = Vec::new();
+            let mut temp = [0u8; 8192];
+            let mut header_end = None;
+            let mut content_length: usize = 0;
+
+            loop {
+                let n = match socket.read(&mut temp).await {
+                    Ok(n) if n > 0 => n,
+                    _ => break,
+                };
+                received.extend_from_slice(&temp[..n]);
+
+                if header_end.is_none() {
+                    if let Some(pos) = received.windows(4).position(|w| w == b"\r\n\r\n") {
+                        header_end = Some(pos + 4);
+                        let header_str = String::from_utf8_lossy(&received[..pos]);
+                        for line in header_str.lines() {
+                            if line.to_ascii_lowercase().starts_with("content-length:") {
+                                if let Some(val_str) = line.split(':').nth(1) {
+                                    content_length = val_str.trim().parse::<usize>().unwrap_or(0);
+                                }
+                            }
+                        }
+                    } else if let Some(pos) = received.windows(2).position(|w| w == b"\n\n") {
+                        header_end = Some(pos + 2);
+                    }
+                }
+
+                if let Some(h_end) = header_end {
+                    if received.len() >= h_end + content_length {
+                        break;
+                    }
+                }
+            }
+
+            let h_end = match header_end {
+                Some(pos) => pos,
+                None => return,
             };
 
-            let req_str = String::from_utf8_lossy(&buf[..n]);
+            let req_str = String::from_utf8_lossy(&received[..h_end]);
             let mut lines = req_str.lines();
             if let Some(req_line) = lines.next() {
                 let parts: Vec<&str> = req_line.split_whitespace().collect();
@@ -45,14 +79,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let method = parts[0];
                     let path = parts[1];
 
-                    // Extract body if present (split on \r\n\r\n or \n\n)
-                    let body = if let Some(idx) = req_str.find("\r\n\r\n") {
-                        &req_str[idx + 4..]
-                    } else if let Some(idx) = req_str.find("\n\n") {
-                        &req_str[idx + 2..]
+                    let body_slice = if received.len() >= h_end + content_length {
+                        &received[h_end..h_end + content_length]
                     } else {
-                        ""
+                        &received[h_end..]
                     };
+                    let body = String::from_utf8_lossy(body_slice);
 
                     println!("[REQ] peer={} method={} path={}", peer_addr, method, path);
 
@@ -63,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             body: serde_json::Value::Null,
                         }
                     } else {
-                        gw.dispatch_request(method, path, body).await
+                        gw.dispatch_request(method, path, &body).await
                     };
 
                     let resp_bytes = response.to_http_bytes();

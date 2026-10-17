@@ -187,3 +187,95 @@ async fn test_gateway_http_bytes_cors_and_serialization() {
     assert!(http_str.contains("Content-Length: "));
     assert!(http_str.contains("\"jurisdiction\":\"INDIA_LOCALIZED_MUMBAI_BLR\""));
 }
+
+#[test]
+fn test_rfc6455_websocket_handshake_test_vector_and_framing() {
+    use sovereign_gateway::realtime::{compute_ws_accept, encode_ws_text_frame, parse_ws_frame};
+
+    // Standard RFC 6455 Section 4.2.2 Test Vector:
+    // Key: "dGhlIHNhbXBsZSBub25jZQ==" -> Accept: "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    let rfc_key = "dGhlIHNhbXBsZSBub25jZQ==";
+    let accept = compute_ws_accept(rfc_key);
+    assert_eq!(accept, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+
+    // Text frame encode/decode round trip
+    let payload = "Namaste Bharat! Live WebSocket Framing.";
+    let frame_bytes = encode_ws_text_frame(payload);
+    assert_eq!(frame_bytes[0], 0x81); // FIN + Text opcode
+
+    let (opcode, decoded_bytes) = parse_ws_frame(&frame_bytes).unwrap();
+    assert_eq!(opcode, 1);
+    assert_eq!(String::from_utf8(decoded_bytes).unwrap(), payload);
+}
+
+#[tokio::test]
+async fn test_realtime_delivery_receipts_and_dpdp_privacy() {
+    let gateway = GatewayEngine::new();
+    let rt = &gateway.realtime;
+    let now = 1776000000u64;
+
+    let sender = "did:bharat:alice";
+    let recipient = "did:bharat:bob";
+    let msg_id = "msg_live_001";
+
+    // 1. Sent -> 1 Grey Tick
+    let ev_sent = rt.record_sent(msg_id, sender, recipient, now);
+    assert_eq!(ev_sent.status, sovereign_gateway::realtime::DeliveryStatus::Sent);
+    assert!(!ev_sent.blue_ticks);
+
+    // 2. Delivered -> 2 Grey Ticks
+    let ev_deliv = rt.record_delivered(msg_id, now + 1).unwrap();
+    assert_eq!(ev_deliv.status, sovereign_gateway::realtime::DeliveryStatus::Delivered);
+    assert!(!ev_deliv.blue_ticks);
+
+    // 3. Read -> 2 Blue Ticks (both have receipts enabled)
+    let ev_read = rt.record_read(msg_id, recipient, now + 2).unwrap();
+    assert_eq!(ev_read.status, sovereign_gateway::realtime::DeliveryStatus::Read);
+    assert!(ev_read.blue_ticks);
+
+    // 4. DPDP Privacy: Bob disables Read Receipts
+    rt.set_read_receipt_policy(recipient, sovereign_gateway::realtime::ReadReceiptPolicy::Disabled);
+
+    let msg_id_private = "msg_live_002";
+    rt.record_sent(msg_id_private, sender, recipient, now + 10);
+    rt.record_delivered(msg_id_private, now + 11);
+
+    // Bob reads message -> status remains Delivered, blue_ticks is false
+    let ev_read_private = rt.record_read(msg_id_private, recipient, now + 12).unwrap();
+    assert_eq!(ev_read_private.status, sovereign_gateway::realtime::DeliveryStatus::Delivered);
+    assert!(!ev_read_private.blue_ticks);
+}
+
+#[tokio::test]
+async fn test_realtime_presence_and_typing_indicators() {
+    let gateway = GatewayEngine::new();
+    let rt = &gateway.realtime;
+    let now = 1776000000u64;
+
+    let user_a = "did:bharat:rahul";
+    let user_b = "did:bharat:priya";
+    let user_stranger = "did:bharat:stranger";
+
+    // Presence: ContactsOnly policy
+    rt.update_presence(user_a, true, now, sovereign_gateway::realtime::LastSeenPolicy::ContactsOnly);
+    rt.add_contact(user_a, user_b);
+
+    // Priya is an approved contact -> can see Rahul's presence
+    let p_b = rt.query_presence(user_b, user_a);
+    assert!(p_b.is_some());
+    assert!(p_b.unwrap().is_online);
+
+    // Stranger is not a contact -> hidden (None)
+    let p_s = rt.query_presence(user_stranger, user_a);
+    assert!(p_s.is_none());
+
+    // Typing state & auto-expiry (> 5s)
+    let chat_id = "chat_group_surat";
+    rt.set_typing(chat_id, user_a, true, now);
+    let typers = rt.get_active_typers(chat_id, now + 2);
+    assert_eq!(typers, vec![user_a.to_string()]);
+
+    // 6 seconds later -> typing expired
+    let expired_typers = rt.get_active_typers(chat_id, now + 7);
+    assert!(expired_typers.is_empty());
+}

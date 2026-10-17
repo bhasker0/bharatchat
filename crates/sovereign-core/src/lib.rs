@@ -13,6 +13,7 @@ pub mod traceability;
 pub mod erasure;
 pub mod csam_scanner;
 pub mod staking;
+pub mod ratchet;
 
 pub use error::{SovereignError, Result};
 pub use did::{IdentityKeyPair, DidDocument};
@@ -32,4 +33,9 @@ pub use staking::{
     BroadcastResolution,
     MICROSTAKE_PER_RECIPIENT_PAISE,
     MAXIMUM_SPAM_TOLERANCE_RATIO,
+};
+pub use ratchet::{
+    DoubleRatchetSession,
+    RatchetHeader,
+    RatchetEncryptedMessage,
 };
