@@ -9,4 +9,6 @@ members = [
     "crates/sovereign-chain",
     "crates/sovereign-zkp",
     "crates/sovereign-upi",
+    "crates/sovereign-commerce",
+    "crates/sovereign-e2e",
 ]

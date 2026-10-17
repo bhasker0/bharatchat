@@ -601,6 +601,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-commerce"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hex",
+ "serde",
+ "serde_json",
+ "sovereign-core",
+ "sovereign-upi",
+ "thiserror",
+]
+
+[[package]]
 name = "sovereign-core"
 version = "0.1.0"
 dependencies = [
@@ -614,6 +627,27 @@ dependencies = [
  "thiserror",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "sovereign-e2e"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hex",
+ "rand",
+ "serde",
+ "serde_json",
+ "sovereign-calls",
+ "sovereign-chain",
+ "sovereign-commerce",
+ "sovereign-core",
+ "sovereign-relay",
+ "sovereign-storage",
+ "sovereign-upi",
+ "sovereign-zkp",
+ "tokio",
+ "x25519-dalek",
 ]
 
 [[package]]

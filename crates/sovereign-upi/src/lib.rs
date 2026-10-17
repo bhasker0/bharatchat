@@ -72,7 +72,7 @@ pub struct UpiPaymentOrder {
     pub status: PaymentStatus,
     pub initiated_at: u64,
     pub finalized_at: Option<u64>,
-    pub data_jurisdiction: &'static str, // "INDIA_LOCALIZED" as per RBI Directive
+    pub data_jurisdiction: String, // "INDIA_LOCALIZED" as per RBI Directive
 }
 
 impl UpiPaymentOrder {
@@ -102,7 +102,7 @@ impl UpiPaymentOrder {
             status: PaymentStatus::Initiated,
             initiated_at: timestamp,
             finalized_at: None,
-            data_jurisdiction: "INDIA_LOCALIZED_MUMBAI_BLR",
+            data_jurisdiction: "INDIA_LOCALIZED_MUMBAI_BLR".to_string(),
         })
     }
 

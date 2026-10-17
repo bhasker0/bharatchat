@@ -1,0 +1,14 @@
+[package]
+name = "sovereign-commerce"
+version = "0.1.0"
+edition = "2021"
+description = "WhatsApp-Parity Conversational Commerce, JSON-LD Product Catalogs & Cart Order Orchestration"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+sovereign-upi = { path = "../sovereign-upi" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+blake3 = "1.5"
+hex = "0.4"
