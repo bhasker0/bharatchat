@@ -1,0 +1,15 @@
+[package]
+name = "sovereign-storage"
+version = "0.1.0"
+edition = "2021"
+description = "Off-Chain Encrypted Storage Engine with DPDP Cascade Unpinning"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+blake3 = "1.5"
+aes-gcm = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+hex = "0.4"
+tokio = { version = "1.38", features = ["sync", "macros", "rt"] }

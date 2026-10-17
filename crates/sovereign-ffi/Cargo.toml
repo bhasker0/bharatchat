@@ -1,0 +1,13 @@
+[package]
+name = "sovereign-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "C-FFI Mobile Integration Bridge for Flutter/Dart"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+sovereign-storage = { path = "../sovereign-storage" }
+sovereign-calls = { path = "../sovereign-calls" }

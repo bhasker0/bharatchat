@@ -1,0 +1,13 @@
+[package]
+name = "sovereign-calls"
+version = "0.1.0"
+edition = "2021"
+description = "WebRTC SFU Call Signaling with SFrame E2EE Key Distribution"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+hex = "0.4"

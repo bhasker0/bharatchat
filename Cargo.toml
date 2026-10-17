@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/sovereign-core",
+    "crates/sovereign-relay",
+    "crates/sovereign-storage",
+    "crates/sovereign-calls",
+    "crates/sovereign-ffi",
+]

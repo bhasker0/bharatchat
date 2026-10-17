@@ -1,0 +1,17 @@
+[package]
+name = "sovereign-relay"
+version = "0.1.0"
+edition = "2021"
+description = "Ephemeral Zero-Retention Message Relay Mesh"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+tokio = { version = "1.38", features = ["sync", "time", "macros", "rt"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.38", features = ["full"] }
+rand = "0.8"
+x25519-dalek = "2.0"
