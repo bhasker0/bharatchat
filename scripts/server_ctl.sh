@@ -105,8 +105,48 @@ start_gateway() {
     echo "============================================================"
 }
 
+WEB_PID_FILE="${DATA_DIR}/web.pid"
+WEB_LOG_FILE="${DATA_DIR}/web.log"
+WEB_DIR="${REPO_ROOT}/client/build/web"
+
+start_web() {
+    echo "=== [4/4] Launching Sovereign Web Client UI ==="
+    if [ -f "${WEB_PID_FILE}" ]; then
+        OLD_WEB_PID=$(cat "${WEB_PID_FILE}")
+        if ps -p "${OLD_WEB_PID}" >/dev/null 2>&1; then
+            echo "      Web Client is already running with PID ${OLD_WEB_PID} on port 3000."
+            return 0
+        fi
+        rm -f "${WEB_PID_FILE}"
+    fi
+
+    if [ ! -d "${WEB_DIR}" ]; then
+        echo "      Web bundle not found. Building Flutter Web..."
+        (cd "${REPO_ROOT}/client" && flutter build web --release)
+    fi
+
+    echo "      Starting Web Client UI daemon on 0.0.0.0:3000..."
+    setsid python3 -m http.server 3000 --directory "${WEB_DIR}" >> "${WEB_LOG_FILE}" 2>&1 &
+    NEW_WEB_PID=$!
+    disown "${NEW_WEB_PID}" 2>/dev/null || true
+    echo "${NEW_WEB_PID}" > "${WEB_PID_FILE}"
+    echo "      Web Client process launched with PID ${NEW_WEB_PID}."
+
+    LAN_IP=$(get_lan_ip)
+    echo "      [OK] Web Client is LIVE on http://localhost:3000 and http://${LAN_IP}:3000"
+}
+
 stop_all() {
-    echo "=== Stopping BharatChat Sovereign Server & Database ==="
+    echo "=== Stopping BharatChat Sovereign Server, Web UI & Database ==="
+    if [ -f "${WEB_PID_FILE}" ]; then
+        WPID=$(cat "${WEB_PID_FILE}")
+        if ps -p "${WPID}" >/dev/null 2>&1; then
+            echo "Stopping Web Client UI (PID ${WPID})..."
+            kill "${WPID}" || true
+        fi
+        rm -f "${WEB_PID_FILE}"
+    fi
+
     if [ -f "${PID_FILE}" ]; then
         PID=$(cat "${PID_FILE}")
         if ps -p "${PID}" >/dev/null 2>&1; then
@@ -126,7 +166,7 @@ stop_all() {
 
 show_status() {
     echo "============================================================"
-    echo "  BHARATCHAT LOCAL SERVER & DATABASE STATUS"
+    echo "  BHARATCHAT LOCAL SERVER, WEB CLIENT & DATABASE STATUS"
     echo "============================================================"
     LAN_IP=$(get_lan_ip)
     echo "  Computer Local IP: ${LAN_IP}"
@@ -142,6 +182,15 @@ show_status() {
     else
         echo "  Status : STOPPED"
     fi
+    echo ""
+    echo "--- Web Client UI Daemon ---"
+    if [ -f "${WEB_PID_FILE}" ] && ps -p "$(cat "${WEB_PID_FILE}")" >/dev/null 2>&1; then
+        echo "  Status : RUNNING (PID $(cat "${WEB_PID_FILE}"))"
+        echo "  Local  : http://localhost:3000"
+        echo "  LAN    : http://${LAN_IP}:3000"
+    else
+        echo "  Status : STOPPED"
+    fi
     echo "============================================================"
 }
 
@@ -149,6 +198,7 @@ case "${1:-status}" in
     start)
         start_db
         start_gateway
+        start_web
         ;;
     stop)
         stop_all
@@ -158,6 +208,7 @@ case "${1:-status}" in
         sleep 2
         start_db
         start_gateway
+        start_web
         ;;
     status)
         show_status
