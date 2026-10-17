@@ -1,0 +1,289 @@
+{
+  "name": "master-agent-skills",
+  "version": "2.0.0",
+  "description": "Unified skills library combining Harness DevOps/CI/CD, Quicknode Blockchain, and Claude Engineering skills.",
+  "plugins": [
+    {
+      "name": "harness-pipelines",
+      "dir": "skills/pipelines",
+      "title": "Harness Pipelines & Execution",
+      "description": "Create v0 and v1 pipelines, triggers, templates and freeze windows, then run, debug and migrate them.",
+      "category": "ci-cd",
+      "skills": [
+        "create-pipeline",
+        "create-pipeline-v1",
+        "create-template",
+        "create-trigger",
+        "debug-pipeline",
+        "manage-freeze-windows",
+        "migrate-pipeline",
+        "run-pipeline"
+      ]
+    },
+    {
+      "name": "harness-infrastructure",
+      "dir": "skills/infrastructure",
+      "title": "Harness Infrastructure & Resources",
+      "description": "Define services, environments, infrastructure, connectors and secrets for Harness deployments.",
+      "category": "infrastructure",
+      "skills": [
+        "create-connector",
+        "create-environment",
+        "create-infrastructure",
+        "create-secret",
+        "create-service"
+      ]
+    },
+    {
+      "name": "harness-access-control",
+      "dir": "skills/access-control",
+      "title": "Harness Access Control & Users",
+      "description": "Manage users, user groups, service accounts, roles, resource groups and RBAC assignments.",
+      "category": "security",
+      "skills": [
+        "manage-roles",
+        "manage-users"
+      ]
+    },
+    {
+      "name": "harness-fme",
+      "dir": "skills/fme",
+      "title": "Harness FME (Feature Flags & Experimentation)",
+      "description": "Discover, create, target, roll out, clean up and experiment with Harness FME feature flags, segments and metrics.",
+      "category": "feature-flags",
+      "skills": [
+        "choose-metric",
+        "cleanup-feature-flags",
+        "create-experiment",
+        "create-feature-flag",
+        "create-metric",
+        "discover-feature-flags",
+        "explain-flag",
+        "feature-flag-onboarding",
+        "fme-pipeline",
+        "instrument-feature-flag",
+        "instrument-metric",
+        "manage-experiments",
+        "manage-flag-lifecycle",
+        "manage-segments",
+        "review-experiment-results",
+        "update-flag-targeting"
+      ]
+    },
+    {
+      "name": "harness-database",
+      "dir": "skills/database",
+      "title": "Harness Database DevOps",
+      "description": "Generate, review and run Liquibase changesets with Harness Database DevOps.",
+      "category": "database",
+      "skills": [
+        "dbops-changeset"
+      ]
+    },
+    {
+      "name": "harness-platform",
+      "dir": "skills/platform",
+      "title": "Harness Platform Operations",
+      "description": "Operate delegates, IaCM workspaces, cloud development environments, artifact registries, SBOMs, supply chain and pull requests.",
+      "category": "platform",
+      "skills": [
+        "create-sbom",
+        "enforce-sbom",
+        "manage-artifacts",
+        "manage-cde",
+        "manage-delegates",
+        "manage-iacm",
+        "manage-pull-requests",
+        "manage-supply-chain"
+      ]
+    },
+    {
+      "name": "harness-security",
+      "dir": "skills/security",
+      "title": "Harness Security Testing & Supply Chain",
+      "description": "Add STO code, secret, container and DAST scans, SLSA provenance and artifact signing, and manage exemptions and PR attestation.",
+      "category": "security",
+      "skills": [
+        "approve-exempt",
+        "configure-agent-pr-attestation",
+        "configure-container-scan",
+        "configure-dast-scan",
+        "configure-repo-scan",
+        "configure-secret-scan",
+        "enforce-slsa",
+        "exempt-vuln",
+        "generate-slsa",
+        "sign-artifact",
+        "verify-sign"
+      ]
+    },
+    {
+      "name": "harness-observability-governance",
+      "dir": "skills/observability-governance",
+      "title": "Harness Observability & Governance",
+      "description": "Costs, DORA, SLOs, chaos, scorecards, audits, OPA policies, IDP, SEI analytics and deployment risk insights.",
+      "category": "observability",
+      "skills": [
+        "ai-operations",
+        "analyze-costs",
+        "audit-report",
+        "chaos-dr-test",
+        "chaos-experiment",
+        "create-policy",
+        "deployment-readiness",
+        "dora-metrics",
+        "gitops-status",
+        "incident-response",
+        "manage-idp",
+        "manage-slos",
+        "optimize-pipeline",
+        "pr-analysis",
+        "scorecard-review",
+        "security-report",
+        "sei-analytics",
+        "template-usage"
+      ]
+    },
+    {
+      "name": "harness-agents",
+      "dir": "skills/agents",
+      "title": "Harness AI Agents",
+      "description": "Create Harness AI agents and agent templates for agentic pipeline workflows.",
+      "category": "ai-agents",
+      "skills": [
+        "create-agent",
+        "create-agent-template"
+      ]
+    },
+    {
+      "name": "blockchain-skills",
+      "dir": "skills",
+      "title": "Blockchain & Web3 Infrastructure",
+      "description": "Comprehensive Quicknode blockchain infrastructure for 80+ chains: RPC, Streams, Webhooks, Solana gRPC, SQL Explorer, x402, and Agent Subscriptions.",
+      "category": "blockchain",
+      "skills": [
+        "quicknode-skill"
+      ]
+    },
+    {
+      "name": "claude-frontend",
+      "dir": "skills",
+      "title": "Modern Frontend Engineering",
+      "description": "Expert frontend skills for React, Next.js, Vue 3, Angular, Flutter, React Native, Shopify, and WordPress.",
+      "category": "frontend",
+      "skills": [
+        "react-expert",
+        "nextjs-developer",
+        "vue-expert",
+        "vue-expert-js",
+        "angular-architect",
+        "flutter-expert",
+        "react-native-expert",
+        "shopify-expert",
+        "wordpress-pro"
+      ]
+    },
+    {
+      "name": "claude-backend",
+      "dir": "skills",
+      "title": "Backend Languages & Microservices",
+      "description": "Production engineering across Python, Go, Rust, Java, C#, C++, PHP, Ruby on Rails, Swift, and Kotlin.",
+      "category": "backend",
+      "skills": [
+        "python-pro",
+        "fastapi-expert",
+        "django-expert",
+        "django-storages-s3",
+        "golang-pro",
+        "rust-engineer",
+        "java-architect",
+        "spring-boot-engineer",
+        "dotnet-core-expert",
+        "csharp-developer",
+        "cpp-pro",
+        "php-pro",
+        "laravel-specialist",
+        "rails-expert",
+        "kotlin-specialist",
+        "swift-expert",
+        "typescript-pro",
+        "javascript-pro",
+        "nestjs-expert"
+      ]
+    },
+    {
+      "name": "claude-data-ai",
+      "dir": "skills",
+      "title": "AI, Machine Learning & Database Systems",
+      "description": "RAG architectures, LLM prompt engineering, ML pipelines, fine-tuning, PostgreSQL, SQL optimization, and Spark.",
+      "category": "ai-data",
+      "skills": [
+        "rag-architect",
+        "prompt-engineer",
+        "ml-pipeline",
+        "fine-tuning-expert",
+        "sql-pro",
+        "postgres-pro",
+        "database-optimizer",
+        "spark-engineer",
+        "pandas-pro"
+      ]
+    },
+    {
+      "name": "claude-cloud-devops",
+      "dir": "skills",
+      "title": "Cloud, Infrastructure & SRE",
+      "description": "Cloud architecture, Kubernetes orchestration, Terraform IaC, SRE error budgeting, and observability monitoring.",
+      "category": "infrastructure",
+      "skills": [
+        "cloud-architect",
+        "devops-engineer",
+        "kubernetes-specialist",
+        "terraform-engineer",
+        "sre-engineer",
+        "monitoring-expert"
+      ]
+    },
+    {
+      "name": "claude-qa-security",
+      "dir": "skills",
+      "title": "Testing, Security, Chaos & Code Quality",
+      "description": "Code review, security audits, OWASP hardening, TDD/test automation, Playwright E2E, and Chaos engineering.",
+      "category": "security-testing",
+      "skills": [
+        "code-reviewer",
+        "security-reviewer",
+        "secure-code-guardian",
+        "test-master",
+        "debugging-wizard",
+        "playwright-expert",
+        "chaos-engineer"
+      ]
+    },
+    {
+      "name": "claude-architecture-systems",
+      "dir": "skills",
+      "title": "Architecture, MCP Protocols & Workflows",
+      "description": "High-level architecture, microservices, API design, GraphQL, WebSockets, Atlassian/Jira MCP, and system specs.",
+      "category": "architecture",
+      "skills": [
+        "architecture-designer",
+        "microservices-architect",
+        "api-designer",
+        "graphql-architect",
+        "websocket-engineer",
+        "mcp-developer",
+        "atlassian-mcp",
+        "fullstack-guardian",
+        "the-fool",
+        "legacy-modernizer",
+        "feature-forge",
+        "spec-miner",
+        "code-documenter",
+        "cli-developer",
+        "embedded-systems",
+        "game-developer"
+      ]
+    }
+  ]
+}
