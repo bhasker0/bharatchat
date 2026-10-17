@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ffi/sovereign_bridge.dart';
+import '../../core/i18n/app_localizations.dart';
 
-class ComplianceScreen extends StatefulWidget {
+class ComplianceScreen extends ConsumerStatefulWidget {
   const ComplianceScreen({super.key});
 
   @override
-  State<ComplianceScreen> createState() => _ComplianceScreenState();
+  ConsumerState<ComplianceScreen> createState() => _ComplianceScreenState();
 }
 
-class _ComplianceScreenState extends State<ComplianceScreen> {
+class _ComplianceScreenState extends ConsumerState<ComplianceScreen> {
   String did = "did:bharat:7a9f8e4d2b1c6e5a3f0d9c8b7a6e5f4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b";
   bool isAdultVerified = true;
   bool simBound = true;
@@ -55,6 +57,8 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentLang = ref.watch(languageProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("DPDP & Legal Compliance Dashboard"),
@@ -62,6 +66,79 @@ class _ComplianceScreenState extends State<ComplianceScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Eighth Schedule Localization (DPDP Act 2023 Sec 5)
+          Card(
+            color: AppTheme.surfaceDark,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.language, color: AppTheme.primaryGreen, size: 22),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          "Eighth Schedule Language (DPDP Sec 5)",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryGreen.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppTheme.primaryGreen, width: 0.8),
+                        ),
+                        child: const Text(
+                          "7 LANGUAGES",
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Select statutory official language for notices, consent agreements, and app UI.",
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButton<AppLanguage>(
+                    value: currentLang,
+                    isExpanded: true,
+                    dropdownColor: AppTheme.surfaceDark,
+                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                    items: AppLanguage.values.map((lang) {
+                      return DropdownMenuItem<AppLanguage>(
+                        value: lang,
+                        child: Text(lang.nativeName),
+                      );
+                    }).toList(),
+                    onChanged: (newLang) {
+                      if (newLang != null) {
+                        ref.read(languageProvider.notifier).setLanguage(newLang);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildCard(
+            title: "64-Digit E2EE Encrypted Cloud Backup",
+            subtitle: "Argon2id + AES-256-GCM zero-knowledge archive strictly stored in Mumbai/Bengaluru (ap-south-1). 64-digit key never touches servers: 9f8e-4d2b-1c6e-5a3f-0d9c-8b7a-6e5f-4d3c-2b1a-0f9e-8d7c-6b5a-4f3e-2d1c-0b9a-8f7e",
+            icon: Icons.cloud_done_outlined,
+            badgeColor: AppTheme.primaryGreen,
+            badgeText: "AES-256-GCM ENCRYPTED",
+          ),
+          const SizedBox(height: 12),
           _buildCard(
             title: "W3C Sovereign Identity (DID)",
             subtitle: did,

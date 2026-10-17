@@ -14,6 +14,7 @@ pub mod erasure;
 pub mod csam_scanner;
 pub mod staking;
 pub mod ratchet;
+pub mod backup;
 
 pub use error::{SovereignError, Result};
 pub use did::{IdentityKeyPair, DidDocument};
@@ -39,3 +40,4 @@ pub use ratchet::{
     RatchetHeader,
     RatchetEncryptedMessage,
 };
+pub use backup::EncryptedBackupArchive;

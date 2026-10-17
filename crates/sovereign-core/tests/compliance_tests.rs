@@ -170,3 +170,40 @@ fn test_business_broadcast_micro_staking_and_slashing() {
     let blocked_attempt = account.lock_broadcast_stake("bcast_003", 100, current_time + 186_500);
     assert!(matches!(blocked_attempt, Err(SovereignError::StakeViolation(_))));
 }
+
+#[test]
+fn test_encrypted_chat_backup_archive_round_trip() {
+    use sovereign_core::EncryptedBackupArchive;
+
+    let dummy_sqlite_db = b"SQLite format 3\x00... [Encrypted chats, Double Ratchet sessions, contacts]";
+    let valid_64_digit_key = "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0";
+    let wrong_64_digit_key = "0000000000000000000000000000000000000000000000000000000000000000";
+    let invalid_len_key    = "a1b2c3d4e5f6";
+    let timestamp = 1776000000;
+
+    // 1. Create 64-digit E2EE backup
+    let archive = EncryptedBackupArchive::create_backup(dummy_sqlite_db, valid_64_digit_key, timestamp)
+        .expect("Backup creation must succeed");
+
+    assert_eq!(archive.version, 1);
+    assert_ne!(archive.ciphertext, dummy_sqlite_db);
+
+    // 2. Restore with correct key -> successful recovery
+    let restored = archive.restore_backup(valid_64_digit_key)
+        .expect("Restoration with correct 64-digit key must succeed");
+    assert_eq!(restored, dummy_sqlite_db);
+
+    // 3. Restore with wrong key -> rejected with CipherError
+    let wrong_res = archive.restore_backup(wrong_64_digit_key);
+    assert!(wrong_res.is_err(), "Restoration with wrong key must fail");
+
+    // 4. Create with invalid key length -> rejected with CryptoError
+    let bad_key_res = EncryptedBackupArchive::create_backup(dummy_sqlite_db, invalid_len_key, timestamp);
+    assert!(bad_key_res.is_err(), "Invalid key length must fail");
+
+    // 5. Tampered ciphertext -> rejected with CipherError / ContentHashMismatch
+    let mut tampered_archive = archive.clone();
+    tampered_archive.ciphertext[0] ^= 0xFF;
+    let tamper_res = tampered_archive.restore_backup(valid_64_digit_key);
+    assert!(tamper_res.is_err(), "Tampered archive must be rejected");
+}

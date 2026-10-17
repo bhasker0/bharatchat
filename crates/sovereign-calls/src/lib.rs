@@ -4,6 +4,9 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub mod voice_note;
+pub use voice_note::{AudioCodec, VoiceNoteError, VoiceNotePayload};
+
 pub const MAXIMUM_CALL_PARTICIPANTS: usize = 32;
 
 #[derive(Error, Debug)]
