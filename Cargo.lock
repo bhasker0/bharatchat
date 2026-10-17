@@ -592,6 +592,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-broadcast"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hex",
+ "serde",
+ "serde_json",
+ "sovereign-core",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "sovereign-calls"
 version = "0.1.0"
 dependencies = [
@@ -681,6 +694,7 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
+ "sovereign-broadcast",
  "sovereign-chain",
  "sovereign-commerce",
  "sovereign-core",

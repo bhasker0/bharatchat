@@ -1,0 +1,14 @@
+[package]
+name = "sovereign-broadcast"
+version = "0.1.0"
+edition = "2021"
+description = "Ephemeral Status Stories, Broadcast Channels, Misinformation Viral Friction & Cryptographic Abuse Reporting"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+blake3 = "1.5"
+hex = "0.4"
+tokio = { version = "1.40", features = ["full"] }

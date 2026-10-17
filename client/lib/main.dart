@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'features/chat/chat_screen.dart';
+import 'features/updates/updates_screen.dart';
 import 'features/calls/group_call_screen.dart';
 import 'features/commerce/catalog_screen.dart';
 import 'features/compliance/compliance_screen.dart';
@@ -37,6 +38,7 @@ class _RootNavigationScreenState extends State<RootNavigationScreen> {
 
   final List<Widget> _screens = const [
     ChatScreen(),
+    UpdatesScreen(),
     GroupCallScreen(),
     CatalogScreen(),
     ComplianceScreen(),
@@ -58,6 +60,11 @@ class _RootNavigationScreenState extends State<RootNavigationScreen> {
             icon: Icon(Icons.chat_bubble_outline),
             activeIcon: Icon(Icons.chat_bubble),
             label: "Chats",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.update_outlined),
+            activeIcon: Icon(Icons.update),
+            label: "Updates",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.call_outlined),

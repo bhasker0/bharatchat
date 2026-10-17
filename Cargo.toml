@@ -15,4 +15,5 @@ members = [
     "crates/sovereign-mls",
     "crates/sovereign-bench",
     "crates/sovereign-gateway",
+    "crates/sovereign-broadcast",
 ]

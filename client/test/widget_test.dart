@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:bharatchat_client/main.dart';
 import 'package:bharatchat_client/features/chat/chat_screen.dart';
+import 'package:bharatchat_client/features/updates/updates_screen.dart';
 import 'package:bharatchat_client/features/calls/group_call_screen.dart';
 import 'package:bharatchat_client/features/commerce/catalog_screen.dart';
 import 'package:bharatchat_client/features/compliance/compliance_screen.dart';
@@ -21,6 +22,7 @@ void main() {
 
       // Verify bottom navigation items exist
       expect(find.text('Chats'), findsOneWidget);
+      expect(find.text('Updates'), findsOneWidget);
       expect(find.text('Calls (32)'), findsOneWidget);
       expect(find.text('Catalog'), findsOneWidget);
       expect(find.text('DPDP / Law'), findsOneWidget);
@@ -40,20 +42,29 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 1. Switch to Calls tab
+      // 1. Switch to Updates tab (Status & Channels)
+      await tester.tap(find.text('Updates'));
+      await tester.pumpAndSettle();
+      expect(find.byType(UpdatesScreen), findsOneWidget);
+      expect(find.text('Status'), findsOneWidget);
+      expect(find.text('Channels'), findsOneWidget);
+      expect(find.text('PIB India Fact Check'), findsOneWidget);
+      expect(find.text('Forwarded many times (>= 5 hops)'), findsOneWidget);
+
+      // 2. Switch to Calls tab
       await tester.tap(find.text('Calls (32)'));
       await tester.pumpAndSettle();
       expect(find.byType(GroupCallScreen), findsOneWidget);
       expect(find.text('Surat Textiles Group Call (6/32)'), findsOneWidget);
       expect(find.text('SFrame E2EE Active • Epoch #12'), findsOneWidget);
 
-      // 2. Switch to Catalog tab
+      // 3. Switch to Catalog tab
       await tester.tap(find.text('Catalog'));
       await tester.pumpAndSettle();
       expect(find.byType(CatalogScreen), findsOneWidget);
       expect(find.text('Pure Kanjivaram Silk Saree'), findsOneWidget);
 
-      // 3. Switch to DPDP Compliance tab
+      // 4. Switch to DPDP Compliance tab
       await tester.tap(find.text('DPDP / Law'));
       await tester.pumpAndSettle();
       expect(find.byType(ComplianceScreen), findsOneWidget);
