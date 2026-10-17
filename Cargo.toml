@@ -13,4 +13,5 @@ members = [
     "crates/sovereign-e2e",
     "crates/sovereign-multidevice",
     "crates/sovereign-mls",
+    "crates/sovereign-bench",
 ]

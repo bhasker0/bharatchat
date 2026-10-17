@@ -578,6 +578,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-bench"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "rand",
+ "sovereign-core",
+ "sovereign-mls",
+ "sovereign-multidevice",
+ "sovereign-storage",
+ "tokio",
+ "x25519-dalek",
+]
+
+[[package]]
 name = "sovereign-calls"
 version = "0.1.0"
 dependencies = [

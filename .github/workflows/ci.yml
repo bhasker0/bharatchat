@@ -1,0 +1,88 @@
+name: Sovereign Platform CI/CD & Statutory Compliance Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  rust-workspace-verification:
+    name: Rust Workspace Build & 100% Assertion Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Stable Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check Workspace Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Execute Workspace Test Suite (21 Tests)
+        run: cargo test --workspace --verbose
+
+      - name: Execute Cryptographic Performance Benchmarks
+        run: cargo run --release -p sovereign-bench
+
+  statutory-legal-audit:
+    name: Indian Cyber Law & Regulatory Compliance Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11+
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Execute CERT-In & DPDP Statutory Audit Suite
+        run: |
+          chmod +x scripts/audit_compliance.py
+          python3 scripts/audit_compliance.py
+
+      - name: Smoke Test Legal & Grievance Operations CLI
+        run: |
+          chmod +x scripts/sovereign_legal_cli.py
+          python3 scripts/sovereign_legal_cli.py rgo create-ticket \
+            --complainant-did "did:bharat:ci_test_user" \
+            --category "SPAM" \
+            --description "Automated CI verification grievance"
+          python3 scripts/sovereign_legal_cli.py rgo list-tickets
+          python3 scripts/sovereign_legal_cli.py cco inspect-warrant \
+            --court-case "WP(C)-CI-001/2026" \
+            --content-cid "bafkci_test_hash"
+          python3 scripts/sovereign_legal_cli.py certin export-incident \
+            --incident-type "CI_TEST_ALERT"
+
+  infrastructure-validation:
+    name: Kubernetes Manifests & Docker Compose Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configuration
+        run: docker compose -f infra/docker-compose.yml config
+
+      - name: Validate Kubernetes Manifests Syntax
+        run: |
+          for f in infra/k8s/*.yaml; do
+            echo "Linting $f..."
+            python3 -c "import yaml; list(yaml.safe_load_all(open('$f')))"
+          done

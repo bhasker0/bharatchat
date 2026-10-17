@@ -46,3 +46,5 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 target/
+grievances_db.json
+certin_report.json

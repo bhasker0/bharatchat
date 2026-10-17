@@ -1,0 +1,15 @@
+[package]
+name = "sovereign-bench"
+version = "0.1.0"
+edition = "2021"
+description = "High-Performance Cryptographic & System Micro-Benchmark Suite"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+sovereign-mls = { path = "../sovereign-mls" }
+sovereign-multidevice = { path = "../sovereign-multidevice" }
+sovereign-storage = { path = "../sovereign-storage" }
+blake3 = "1.5"
+rand = "0.8"
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+tokio = { version = "1.40", features = ["full"] }
