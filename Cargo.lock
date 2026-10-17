@@ -590,6 +590,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-chain"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "sovereign-core",
+ "thiserror",
+]
+
+[[package]]
 name = "sovereign-core"
 version = "0.1.0"
 dependencies = [
@@ -639,6 +650,30 @@ dependencies = [
  "sovereign-core",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "sovereign-upi"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hex",
+ "rand",
+ "serde",
+ "serde_json",
+ "sovereign-core",
+ "thiserror",
+]
+
+[[package]]
+name = "sovereign-zkp"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "rand",
+ "serde",
+ "sovereign-core",
+ "thiserror",
 ]
 
 [[package]]

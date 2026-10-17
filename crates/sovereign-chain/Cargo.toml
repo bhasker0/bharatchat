@@ -1,0 +1,12 @@
+[package]
+name = "sovereign-chain"
+version = "0.1.0"
+edition = "2021"
+description = "Permissioned Consortium Blockchain State Machine (DID, DPDP Consent & Staking)"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+blake3 = "1.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"

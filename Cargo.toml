@@ -6,4 +6,7 @@ members = [
     "crates/sovereign-storage",
     "crates/sovereign-calls",
     "crates/sovereign-ffi",
+    "crates/sovereign-chain",
+    "crates/sovereign-zkp",
+    "crates/sovereign-upi",
 ]

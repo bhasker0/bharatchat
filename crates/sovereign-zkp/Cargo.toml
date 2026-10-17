@@ -1,0 +1,12 @@
+[package]
+name = "sovereign-zkp"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-Knowledge Age Verification Gateway (DPDP Act 2023 Sec 9)"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+blake3 = "1.5"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+rand = "0.8"
