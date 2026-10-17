@@ -13,6 +13,8 @@ import os
 import signal
 import sys
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 def main():
     port = "8088"
     env = os.environ.copy()
@@ -22,7 +24,7 @@ def main():
     print("[1/5] Compiling and launching Sovereign Gateway daemon on 127.0.0.1:{}...".format(port))
     proc = subprocess.Popen(
         ["cargo", "run", "-p", "sovereign-gateway"],
-        cwd="/home/bhasker-savaliya/hola",
+        cwd=REPO_ROOT,
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -145,7 +147,7 @@ def main():
         assert prob["jurisdiction"] == "INDIA_MUMBAI_BLR"
         print(f"      Post-shred RFC 7807 response confirmed: 404 {prob['title']}")
 
-    print("[6/6] Testing Real-Time Delivery Receipts, Presence & Typing APIs...")
+    print("[6/7] Testing Real-Time Delivery Receipts, Presence & Typing APIs...")
     # 1. Delivery Receipt - Sent (Single Tick)
     receipt_data = json.dumps({
         "action": "sent",
@@ -214,7 +216,93 @@ def main():
         assert typ["is_typing"] is True
         print("      Typing Indicator: ACTIVE (Broadcasting to chat members)")
 
-    print("\n[SUCCESS] Live Gateway Daemon network test passed with 100% fidelity!")
+    print("[7/8] Testing Prometheus SRE Metrics & Live WebSocket RFC 6455 Handshake...")
+    # 1. Prometheus /metrics
+    with urllib.request.urlopen(f"{base_url}/metrics") as resp:
+        assert resp.status == 200
+        metrics_text = resp.read().decode()
+        assert "# HELP http_requests_total" in metrics_text
+        assert "sovereign_cert_in_sla_seconds 21600" in metrics_text
+        assert "sovereign_sim_binding_verifications_total 1" in metrics_text
+        assert "sovereign_dpdp_crypto_shredding_operations_total 1" in metrics_text
+        assert "sovereign_dpdp_shredding_entropy_bits 7.992" in metrics_text
+        print("      Prometheus Golden Signals & Statutory SLA Metrics: VERIFIED")
+
+    # 2. Live WebSocket RFC 6455 Handshake over raw TCP
+    import socket
+    ws_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    ws_sock.connect(("127.0.0.1", int(port)))
+    ws_handshake = (
+        b"GET /ws HTTP/1.1\r\n"
+        b"Host: 127.0.0.1:8088\r\n"
+        b"Upgrade: websocket\r\n"
+        b"Connection: Upgrade\r\n"
+        b"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        b"Sec-WebSocket-Version: 13\r\n\r\n"
+    )
+    ws_sock.sendall(ws_handshake)
+    ws_resp = ws_sock.recv(4096).decode()
+    assert "HTTP/1.1 101 Switching Protocols" in ws_resp
+    assert "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=" in ws_resp
+    print("      RFC 6455 WebSocket 101 Handshake & Key Derivation: VERIFIED")
+
+    # Send close frame
+    ws_sock.sendall(bytes([0x88, 0x00]))
+    ws_sock.close()
+    print("      WebSocket Session Graceful Close: VERIFIED")
+
+    print("[8/8] Testing Ephemeral 24h Status, Broadcast Channels & Forwarding Limits...")
+    # 1. Ephemeral 24h Status
+    status_payload = json.dumps({
+        "story_id": "story_live_001",
+        "author_did": test_did,
+        "content_cid": "cid_gateway_live_media",
+        "caption": "Live daemon broadcast status test",
+        "audience_type": "MyContacts",
+        "timestamp": 1776000000
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/broadcast/status", data=status_payload, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        assert resp.status == 201
+        st = json.loads(resp.read().decode())
+        assert st["story_id"] == "story_live_001"
+        assert st["expires_at"] == 1776000000 + 86400
+        print("      24h Ephemeral Status Posting: VERIFIED (Expires in 86400s)")
+
+    # 2. Broadcast Channel
+    chan_payload = json.dumps({
+        "channel_id": "chan_live_pib",
+        "name": "PIB Live Updates",
+        "description": "Press Information Bureau Live Stream",
+        "admin_did": test_did,
+        "is_public": True,
+        "timestamp": 1776000000
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/broadcast/channel", data=chan_payload, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as resp:
+        assert resp.status == 201
+        ch = json.loads(resp.read().decode())
+        assert ch["channel_id"] == "chan_live_pib"
+        print("      One-to-Many Broadcast Channel Creation: VERIFIED")
+
+    # 3. Forwarding Friction Check
+    fwd_payload = json.dumps({
+        "message_cid": "cid_viral_rumor_001",
+        "sender_did": test_did,
+        "hop_count": 5,
+        "target_chats": ["chat1", "chat2", "chat3"]
+    }).encode("utf-8")
+    req = urllib.request.Request(f"{base_url}/api/v1/broadcast/forward/check", data=fwd_payload, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req)
+        assert False, "Should have returned 422"
+    except urllib.error.HTTPError as e:
+        assert e.code == 422
+        prob = json.loads(e.read().decode())
+        assert prob["title"] == "Viral Forwarding Limit Exceeded"
+        print("      Misinformation Viral Friction Engine: 422 Block Confirmed for Multi-Chat Forwarding")
+
+    print("\n[SUCCESS] Live Gateway Daemon network test passed with 100% fidelity across all 8 stages!")
     proc.terminate()
     try:
         proc.wait(timeout=3)

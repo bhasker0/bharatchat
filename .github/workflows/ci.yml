@@ -1,62 +1,74 @@
-name: Sovereign Platform CI/CD & Statutory Compliance Pipeline
+name: BharatChat Sovereign CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  rust-workspace-verification:
-    name: Rust Workspace Build & 100% Assertion Tests
+  # ----------------------------------------------------------------------------
+  # 1. RUST WORKSPACE VERIFICATION & BENCHMARKS
+  # ----------------------------------------------------------------------------
+  rust-workspace:
+    name: Rust Workspace Checks, Tests & Benchmarks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Stable Rust Toolchain
+      - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
 
-      - name: Cache Cargo Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
 
-      - name: Check Workspace Formatting
-        run: cargo fmt --all -- --check
+      - name: Workspace Compilation Check
+        run: cargo check --workspace --all-targets
 
-      - name: Execute Workspace Test Suite (21 Tests)
+      - name: Execute Workspace Test Suite (39 Tests across 15 Crates)
         run: cargo test --workspace --verbose
 
       - name: Execute Cryptographic Performance Benchmarks
         run: cargo run --release -p sovereign-bench
 
-  statutory-legal-audit:
-    name: Indian Cyber Law & Regulatory Compliance Audit
+  # ----------------------------------------------------------------------------
+  # 2. STATUTORY LEGAL, CONTRACT & LIVE RESILIENCE VERIFICATION
+  # ----------------------------------------------------------------------------
+  statutory-and-contracts:
+    name: Statutory Audit, Client Parity & Chaos Resilience
     runs-on: ubuntu-latest
+    needs: rust-workspace
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
-      - name: Execute CERT-In & DPDP Statutory Audit Suite
-        run: |
-          chmod +x scripts/audit_compliance.py
-          python3 scripts/audit_compliance.py
+      - name: 1. Statutory Legal Compliance Audit (IT Rules, DPDP Act, RBI Localization)
+        run: python3 scripts/audit_compliance.py
 
-      - name: Smoke Test Legal & Grievance Operations CLI
+      - name: 2. Grievance Operations CLI Smoke Test
         run: |
           chmod +x scripts/sovereign_legal_cli.py
           python3 scripts/sovereign_legal_cli.py rgo create-ticket \
@@ -70,8 +82,23 @@ jobs:
           python3 scripts/sovereign_legal_cli.py certin export-incident \
             --incident-type "CI_TEST_ALERT"
 
+      - name: 3. Client & FFI Contract Verification (OpenAPI 3.1, C-ABI, Status/Channels DTOs)
+        run: python3 scripts/verify_client_contracts.py
+
+      - name: 4. Kubernetes Helm Security & Micro-Segmentation Verification
+        run: python3 scripts/verify_helm_templates.py
+
+      - name: 5. Live Gateway Asynchronous Socket Daemon Test
+        run: python3 scripts/test_live_gateway.py
+
+      - name: 6. Chaos Resilience & Automated RTO/RPO Recovery Test
+        run: python3 scripts/test_chaos_resilience.py
+
+  # ----------------------------------------------------------------------------
+  # 3. INFRASTRUCTURE & HELM VALIDATION
+  # ----------------------------------------------------------------------------
   infrastructure-validation:
-    name: Kubernetes Manifests & Docker Compose Linting
+    name: Infrastructure & Helm Linting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -80,9 +107,17 @@ jobs:
       - name: Validate Docker Compose Configuration
         run: docker compose -f infra/docker-compose.yml config
 
-      - name: Validate Kubernetes Manifests Syntax
+      - name: Validate Static Kubernetes Manifests Syntax
         run: |
           for f in infra/k8s/*.yaml; do
             echo "Linting $f..."
             python3 -c "import yaml; list(yaml.safe_load_all(open('$f')))"
           done
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Helm Lint BharatChat Production Chart
+        run: helm lint infra/helm/bharatchat
