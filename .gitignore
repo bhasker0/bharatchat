@@ -50,3 +50,12 @@ grievances_db.json
 certin_report.json
 data/
 *.pid
+
+# Flutter & Android
+.dart_tool/
+client/.dart_tool/
+client/build/
+.gradle/
+client/android/.gradle/
+client/android/local.properties
+*.apk

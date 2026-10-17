@@ -18,9 +18,9 @@ class GroupCallScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
+        title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text("Surat Textiles Group Call (6/32)", style: TextStyle(fontSize: 16)),
             Text(
               "SFrame E2EE Active • Epoch #12",
@@ -40,7 +40,7 @@ class GroupCallScreen extends StatelessWidget {
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(8),
-              gridDelegate: const dynamicGridDelegate(),
+              gridDelegate: const DynamicGridDelegate(),
               itemCount: participants.length,
               itemBuilder: (context, index) {
                 final p = participants[index];
@@ -144,8 +144,8 @@ class GroupCallScreen extends StatelessWidget {
   }
 }
 
-class dynamicGridDelegate extends SliverGridDelegateWithFixedCrossAxisCount {
-  const dynamicGridDelegate()
+class DynamicGridDelegate extends SliverGridDelegateWithFixedCrossAxisCount {
+  const DynamicGridDelegate()
       : super(
           crossAxisCount: 2,
           crossAxisSpacing: 8,

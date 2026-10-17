@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Supported Languages under Eighth Schedule of the Constitution of India (DPDP Act 2023 Sec 5 Mandate)

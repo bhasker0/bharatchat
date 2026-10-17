@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/ffi/sovereign_bridge.dart';
 import '../../core/i18n/app_localizations.dart';
 
 class ComplianceScreen extends ConsumerStatefulWidget {

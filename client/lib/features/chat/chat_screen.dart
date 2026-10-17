@@ -81,16 +81,16 @@ class ChatScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+        title: const Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               backgroundColor: AppTheme.primaryGreen,
               child: Icon(Icons.storefront, color: Colors.white),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text("Surat Heritage Silk", style: TextStyle(fontSize: 16)),
                 Text(
                   "Verified Merchant • E2EE Encrypted",
@@ -129,8 +129,8 @@ class ChatScreen extends ConsumerWidget {
               color: AppTheme.surfaceDark.withOpacity(0.8),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
-              children: const [
+            child: const Row(
+              children: [
                 Icon(Icons.lock_outline, size: 14, color: AppTheme.accentBlue),
                 SizedBox(width: 8),
                 Expanded(

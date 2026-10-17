@@ -1,4 +1,4 @@
-package in.bharatchat.app
+package `in`.bharatchat.app
 
 import io.flutter.embedding.android.FlutterActivity
 

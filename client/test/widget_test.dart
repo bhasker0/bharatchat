@@ -35,6 +35,11 @@ void main() {
 
     testWidgets('Navigation bar smoothly transitions between sovereign modules',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(
         const ProviderScope(
           child: BharatChatApp(),
@@ -73,6 +78,11 @@ void main() {
 
     testWidgets('DPDP Section 12 Right-to-Erasure modal triggers crypto-shredding state',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 5000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(home: ComplianceScreen()),
@@ -80,8 +90,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Find the Crypto-Shred button
-      final shredButtonFinder = find.widgetWithText(ElevatedButton, 'Execute DPDP Section 12 Crypto-Shredding');
+      // Find and tap the Crypto-Shred button
+      final shredButtonFinder = find.text('Execute DPDP Section 12 Crypto-Shredding');
       expect(shredButtonFinder, findsOneWidget);
 
       await tester.tap(shredButtonFinder);

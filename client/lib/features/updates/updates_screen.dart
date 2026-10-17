@@ -413,8 +413,8 @@ class UpdatesScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.verified_user, size: 14, color: AppTheme.primaryGreen),
                     SizedBox(width: 4),
                     Text(

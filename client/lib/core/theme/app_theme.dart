@@ -32,7 +32,6 @@ class AppTheme {
       colorScheme: const ColorScheme.dark(
         primary: primaryGreen,
         surface: surfaceDark,
-        background: darkBackground,
       ),
       useMaterial3: true,
     );

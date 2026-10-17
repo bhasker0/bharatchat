@@ -92,7 +92,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       subtotal += p.priceInr * qty;
     });
 
-    final gstRate = 5.0; // 5% GST for textiles
+    const gstRate = 5.0; // 5% GST for textiles
     final totalGst = subtotal * (gstRate / 100.0);
     final cgst = totalGst / 2.0;
     final sgst = totalGst / 2.0;
@@ -127,7 +127,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("CGST (2.5%):", style: const TextStyle(color: AppTheme.textSecondary)),
+                  const Text("CGST (2.5%):", style: TextStyle(color: AppTheme.textSecondary)),
                   Text("₹${cgst.toStringAsFixed(2)}", style: const TextStyle(color: AppTheme.textPrimary)),
                 ],
               ),
@@ -135,7 +135,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("SGST (2.5%):", style: const TextStyle(color: AppTheme.textSecondary)),
+                  const Text("SGST (2.5%):", style: TextStyle(color: AppTheme.textSecondary)),
                   Text("₹${sgst.toStringAsFixed(2)}", style: const TextStyle(color: AppTheme.textPrimary)),
                 ],
               ),
@@ -148,8 +148,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Icon(Icons.sim_card_outlined, size: 14, color: AppTheme.primaryGreen),
                   SizedBox(width: 6),
                   Text("Hardware SIM-Bound: Pixel 9 Pro (Airtel)", style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
