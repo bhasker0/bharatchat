@@ -1,0 +1,17 @@
+apiVersion: v2
+name: bharatchat
+description: Production Helm Chart for BharatChat Sovereign Communication & Commerce Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0-PROD"
+keywords:
+  - sovereign-messaging
+  - whatsapp-parity
+  - dpdp-act-2023
+  - it-rules-2021
+  - zero-trust-e2ee
+  - upi-2-0
+home: https://bharatchat.in
+maintainers:
+  - name: BharatChat SRE & Security Engineering Team
+    email: sre@bharatchat.in

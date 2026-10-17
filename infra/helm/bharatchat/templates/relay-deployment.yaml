@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-relay
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  replicas: {{ .Values.relay.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: relay
+  template:
+    metadata:
+      labels:
+        {{- include "bharatchat.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: relay
+      annotations:
+        sovereign.in/jurisdiction: {{ .Values.global.jurisdiction | quote }}
+        sovereign.in/ephemeral-zero-disk: "true"
+    spec:
+      serviceAccountName: {{ include "bharatchat.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: relay
+          image: "{{ .Values.relay.image.repository }}:{{ .Values.relay.image.tag }}"
+          imagePullPolicy: {{ .Values.relay.image.pullPolicy }}
+          ports:
+            - name: tcp-relay
+              containerPort: {{ .Values.relay.service.port }}
+              protocol: TCP
+          env:
+            - name: RELAY_PORT
+              value: "{{ .Values.relay.service.port }}"
+            - name: ZERO_DISK_RETENTION
+              value: "true"
+            - name: SOVEREIGN_JURISDICTION
+              value: {{ .Values.global.jurisdiction | quote }}
+          resources:
+            {{- toYaml .Values.relay.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.relay.probes.liveness | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.relay.probes.readiness | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-relay
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  type: {{ .Values.relay.service.type }}
+  ports:
+    - port: {{ .Values.relay.service.port }}
+      targetPort: tcp-relay
+      protocol: TCP
+      name: tcp-relay
+  selector:
+    {{- include "bharatchat.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: relay

@@ -279,3 +279,169 @@ async fn test_realtime_presence_and_typing_indicators() {
     let expired_typers = rt.get_active_typers(chat_id, now + 7);
     assert!(expired_typers.is_empty());
 }
+
+#[tokio::test]
+async fn test_gateway_sre_prometheus_metrics_and_statutory_slas() {
+    let gateway = GatewayEngine::new();
+    let now = 1776000000u64;
+
+    // 1. Initial GET /metrics
+    let resp = gateway.dispatch_request("GET", "/metrics", "").await;
+    assert_eq!(resp.status_code, 200);
+    let bytes = resp.to_http_bytes();
+    let text = String::from_utf8(bytes).unwrap();
+
+    assert!(text.contains("Content-Type: text/plain; version=0.0.4\r\n"));
+    assert!(text.contains("# HELP http_requests_total"));
+    assert!(text.contains("# HELP http_request_duration_seconds"));
+    assert!(text.contains("sovereign_cert_in_sla_seconds 21600"));
+    assert!(text.contains("sovereign_active_websocket_connections 0"));
+
+    // 2. Perform actions to increment metrics
+    let id = IdentityKeyPair::generate();
+    let order_body = serde_json::json!({
+        "order_id": "ORD-METRIC-01",
+        "customer_did": id.did,
+        "merchant_did": "did:bharat:merchant",
+        "items": [
+            { "product_id": "p1", "name": "Item 1", "unit_price": 500.0, "quantity": 1 }
+        ],
+        "gst_rate": 5.0,
+        "payee_vpa": "merchant@upi",
+        "payee_name": "Merchant",
+        "timestamp": now
+    }).to_string();
+    let _ = gateway.dispatch_request("POST", "/api/v1/commerce/order", &order_body).await;
+
+    let shred_body = serde_json::json!({
+        "did": id.did,
+        "timestamp": now + 50
+    }).to_string();
+    let _ = gateway.dispatch_request("POST", "/api/v1/compliance/shred", &shred_body).await;
+
+    // 3. Query /metrics again
+    let resp2 = gateway.dispatch_request("GET", "/metrics", "").await;
+    assert_eq!(resp2.status_code, 200);
+    let text2 = String::from_utf8(resp2.to_http_bytes()).unwrap();
+
+    assert!(text2.contains("sovereign_sim_binding_verifications_total 1"));
+    assert!(text2.contains("sovereign_dpdp_crypto_shredding_operations_total 1"));
+    assert!(text2.contains("sovereign_dpdp_shredding_entropy_bits 7.992"));
+    assert!(text2.contains("http_requests_total{method=\"POST\",path=\"/api/v1/commerce/order\",status=\"201\"} 1"));
+    assert!(text2.contains("http_requests_total{method=\"POST\",path=\"/api/v1/compliance/shred\",status=\"200\"} 1"));
+}
+
+#[tokio::test]
+async fn test_gateway_broadcast_status_channel_forwarding_and_abuse() {
+    let gateway = GatewayEngine::new();
+    let now = 1776000000u64;
+
+    let admin = IdentityKeyPair::generate();
+    let user_alice = "did:bharat:status_alice";
+
+    // 1. Post Status Story
+    let status_req = serde_json::json!({
+        "story_id": "story_gw_01",
+        "author_did": user_alice,
+        "content_cid": "cid_gateway_media_01",
+        "caption": "Namaste India! 🇮🇳",
+        "audience_type": "MyContacts",
+        "timestamp": now
+    }).to_string();
+    let resp = gateway.dispatch_request("POST", "/api/v1/broadcast/status", &status_req).await;
+    assert_eq!(resp.status_code, 201);
+    assert_eq!(resp.body["story_id"], "story_gw_01");
+
+    // 2. Query Status Stories
+    let get_status_path = format!("/api/v1/broadcast/status/{}", user_alice);
+    let resp = gateway.dispatch_request("GET", &get_status_path, "").await;
+    assert_eq!(resp.status_code, 200);
+    assert_eq!(resp.body.as_array().unwrap().len(), 1);
+
+    // 3. Create Broadcast Channel
+    let chan_req = serde_json::json!({
+        "channel_id": "chan_isro_updates",
+        "name": "ISRO Space Dispatch",
+        "description": "Official updates from Indian Space Research Organisation",
+        "admin_did": admin.did,
+        "is_public": true,
+        "timestamp": now
+    }).to_string();
+    let resp = gateway.dispatch_request("POST", "/api/v1/broadcast/channel", &chan_req).await;
+    assert_eq!(resp.status_code, 201);
+    assert_eq!(resp.body["channel_id"], "chan_isro_updates");
+
+    // 4. Publish Channel Post
+    let post_req = serde_json::json!({
+        "post_id": "post_gaganyaan_01",
+        "author_did": admin.did,
+        "content_cid": "cid_gaganyaan_launch",
+        "text": "Gaganyaan orbital module successful qualification test.",
+        "signature_hex": "aa".repeat(64),
+        "timestamp": now + 10
+    }).to_string();
+    let publish_path = "/api/v1/broadcast/channel/chan_isro_updates/publish";
+    let resp = gateway.dispatch_request("POST", publish_path, &post_req).await;
+    assert_eq!(resp.status_code, 201);
+    assert_eq!(resp.body["post_id"], "post_gaganyaan_01");
+
+    // 5. Query Channel Feed
+    let resp = gateway.dispatch_request("GET", "/api/v1/broadcast/channel/chan_isro_updates", "").await;
+    assert_eq!(resp.status_code, 200);
+    assert_eq!(resp.body.as_array().unwrap().len(), 1);
+
+    // 6. Forwarding Limit Evaluation
+    // Hop count = 1 -> 3 chats allowed
+    let fwd_ok_req = serde_json::json!({
+        "message_cid": "cid_msg_001",
+        "sender_did": admin.did,
+        "hop_count": 1,
+        "target_chats": ["chat1", "chat2", "chat3"]
+    }).to_string();
+    let resp = gateway.dispatch_request("POST", "/api/v1/broadcast/forward/check", &fwd_ok_req).await;
+    assert_eq!(resp.status_code, 200);
+    assert_eq!(resp.body["allowed"], true);
+
+    // Hop count = 5 (frequently forwarded) -> 2 chats BLOCKED (422)
+    let fwd_block_req = serde_json::json!({
+        "message_cid": "cid_msg_001",
+        "sender_did": admin.did,
+        "hop_count": 5,
+        "target_chats": ["chat1", "chat2"]
+    }).to_string();
+    let resp = gateway.dispatch_request("POST", "/api/v1/broadcast/forward/check", &fwd_block_req).await;
+    assert_eq!(resp.status_code, 422);
+    assert_eq!(resp.body["title"], "Viral Forwarding Limit Exceeded");
+
+    // 7. Cryptographic Abuse Report under IT Rules 2021
+    let abusive_msg = "Terror threat warning against public metro station.";
+    let cid_bytes = sovereign_core::compute_canonical_cid(abusive_msg.as_bytes());
+    let cid_hex = hex::encode(cid_bytes);
+
+    let mut sign_payload = Vec::new();
+    sign_payload.extend_from_slice(cid_hex.as_bytes());
+    sign_payload.extend_from_slice(&now.to_be_bytes());
+    let sig_bytes = admin.sign(&sign_payload);
+
+    let abuse_req = serde_json::json!({
+        "dossier": {
+            "dossier_id": "DOSSIER-GW-999",
+            "reported_message_cid": cid_hex,
+            "sender_did": admin.did,
+            "sender_signature_hex": hex::encode(sig_bytes),
+            "plaintext": abusive_msg,
+            "reporter_did": "did:bharat:reporter_citizen",
+            "category": "Terrorism",
+            "timestamp": now,
+            "jurisdiction": "INDIA_LOCALIZED_MUMBAI_BLR"
+        },
+        "sender_vk_hex": hex::encode(admin.document().verifying_key_bytes)
+    }).to_string();
+
+    let resp = gateway.dispatch_request("POST", "/api/v1/compliance/report_abuse", &abuse_req).await;
+    assert_eq!(resp.status_code, 201);
+    assert_eq!(resp.body["ticket_id"], "GRV-IN-DOSSIER-GW-999");
+    assert_eq!(resp.body["status"], "Acknowledged");
+}
+
+

@@ -1,0 +1,170 @@
+global:
+  jurisdiction: "INDIA_LOCALIZED_MUMBAI_BLR"
+  region: "ap-south-1"
+  environment: "production"
+
+serviceAccount:
+  create: true
+  name: "bharatchat-sa"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 2000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector:
+  topology.kubernetes.io/region: ap-south-1
+
+gateway:
+  replicaCount: 3
+  image:
+    repository: "bharatchat/sovereign-gateway"
+    tag: "1.0.0-PROD"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  probes:
+    liveness:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 15
+      periodSeconds: 20
+    readiness:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 10
+
+relay:
+  replicaCount: 3
+  image:
+    repository: "bharatchat/ephemeral-relay"
+    tag: "1.0.0-PROD"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9000
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+  probes:
+    liveness:
+      tcpSocket:
+        port: 9000
+      initialDelaySeconds: 10
+      periodSeconds: 15
+    readiness:
+      tcpSocket:
+        port: 9000
+      initialDelaySeconds: 5
+      periodSeconds: 10
+
+validator:
+  replicaCount: 3
+  image:
+    repository: "bharatchat/consortium-validator"
+    tag: "1.0.0-PROD"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8545
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  persistence:
+    enabled: true
+    size: "50Gi"
+    storageClass: "gp3-encrypted"
+    accessMode: ReadWriteOnce
+
+storage:
+  replicaCount: 3
+  image:
+    repository: "bharatchat/storage-node"
+    tag: "1.0.0-PROD"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 5001
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  persistence:
+    enabled: true
+    size: "100Gi"
+    storageClass: "gp3-encrypted"
+    accessMode: ReadWriteOnce
+
+sfu:
+  replicaCount: 3
+  image:
+    repository: "bharatchat/sfu-media-relay"
+    tag: "1.0.0-PROD"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 7000
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "2Gi"
+    limits:
+      cpu: "4000m"
+      memory: "8Gi"
+
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "bharatchat-gateway"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: api.bharatchat.in
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: bharatchat-tls-secret
+      hosts:
+        - api.bharatchat.in

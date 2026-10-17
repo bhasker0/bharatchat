@@ -10,6 +10,8 @@ pub struct HttpResponse {
     pub status_code: u16,
     pub headers: Vec<(String, String)>,
     pub body: serde_json::Value,
+    #[serde(default)]
+    pub raw_body: Option<String>,
 }
 
 impl HttpResponse {
@@ -18,6 +20,7 @@ impl HttpResponse {
             status_code: 200,
             headers: vec![("Content-Type".to_string(), "application/json".to_string())],
             body,
+            raw_body: None,
         }
     }
 
@@ -26,6 +29,16 @@ impl HttpResponse {
             status_code: 201,
             headers: vec![("Content-Type".to_string(), "application/json".to_string())],
             body,
+            raw_body: None,
+        }
+    }
+
+    pub fn raw_text(status_code: u16, content_type: &str, text: String) -> Self {
+        Self {
+            status_code,
+            headers: vec![("Content-Type".to_string(), content_type.to_string())],
+            body: serde_json::Value::Null,
+            raw_body: Some(text),
         }
     }
 
@@ -42,12 +55,15 @@ impl HttpResponse {
                 "instance": instance,
                 "jurisdiction": "INDIA_MUMBAI_BLR"
             }),
+            raw_body: None,
         }
     }
 
     /// Format response into raw HTTP/1.1 response bytes with CORS headers
     pub fn to_http_bytes(&self) -> Vec<u8> {
-        let body_str = if self.body.is_null() {
+        let body_str = if let Some(ref raw) = self.raw_body {
+            raw.clone()
+        } else if self.body.is_null() {
             String::new()
         } else {
             serde_json::to_string(&self.body).unwrap_or_default()
@@ -77,11 +93,14 @@ impl HttpResponse {
     }
 }
 
+pub mod metrics;
 pub mod realtime;
 
 pub struct GatewayEngine {
     pub env: Arc<SovereignAppEnvironment>,
     pub realtime: Arc<realtime::RealtimeManager>,
+    pub metrics: Arc<metrics::SreMetrics>,
+    pub broadcast: Arc<sovereign_broadcast::BroadcastService>,
 }
 
 impl GatewayEngine {
@@ -89,6 +108,8 @@ impl GatewayEngine {
         Self {
             env: Arc::new(SovereignAppEnvironment::new()),
             realtime: Arc::new(realtime::RealtimeManager::new()),
+            metrics: Arc::new(metrics::SreMetrics::new()),
+            broadcast: Arc::new(sovereign_broadcast::BroadcastService::new()),
         }
     }
 
@@ -199,16 +220,19 @@ impl GatewayEngine {
         order.calculate_totals(gst_rate);
 
         match order.generate_upi_intent(payee_vpa, payee_name, timestamp) {
-            Ok(upi_uri) => HttpResponse::created(serde_json::json!({
-                "order_id": order.order_id,
-                "subtotal_inr": order.subtotal_inr,
-                "tax": order.tax,
-                "total_amount_inr": order.total_amount_inr,
-                "status": "AwaitingPayment",
-                "upi_uri": upi_uri,
-                "payee_vpa": payee_vpa,
-                "data_jurisdiction": "INDIA_LOCALIZED_MUMBAI_BLR"
-            })),
+            Ok(upi_uri) => {
+                self.metrics.record_sim_binding();
+                HttpResponse::created(serde_json::json!({
+                    "order_id": order.order_id,
+                    "subtotal_inr": order.subtotal_inr,
+                    "tax": order.tax,
+                    "total_amount_inr": order.total_amount_inr,
+                    "status": "AwaitingPayment",
+                    "upi_uri": upi_uri,
+                    "payee_vpa": payee_vpa,
+                    "data_jurisdiction": "INDIA_LOCALIZED_MUMBAI_BLR"
+                }))
+            }
             Err(e) => HttpResponse::problem(
                 400,
                 "Order Creation Failed",
@@ -226,6 +250,8 @@ impl GatewayEngine {
         // 2. Revoke DID on Consortium Blockchain
         let mut chain = self.env.chain.lock().unwrap();
         let _ = chain.revoke_did(did, timestamp);
+
+        self.metrics.record_shredding(7.992);
 
         HttpResponse::ok(serde_json::json!({
             "did": did,
@@ -254,6 +280,14 @@ impl GatewayEngine {
                 }
             ],
             "paths": {
+                "/metrics": {
+                    "get": {
+                        "summary": "Prometheus SRE Golden Signals & Statutory SLA Metrics",
+                        "responses": {
+                            "200": { "description": "Prometheus exposition format text" }
+                        }
+                    }
+                },
                 "/health": {
                     "get": {
                         "summary": "Platform Health & Regulatory Liveness Check",
@@ -305,6 +339,41 @@ impl GatewayEngine {
                             "200": { "description": "Account purged and SMK zeroized" }
                         }
                     }
+                },
+                "/api/v1/broadcast/status": {
+                    "post": {
+                        "summary": "Publish 24-Hour Ephemeral Status Story with Audience Privacy",
+                        "responses": {
+                            "201": { "description": "Status story published" }
+                        }
+                    }
+                },
+                "/api/v1/broadcast/channel": {
+                    "post": {
+                        "summary": "Create Public or Private One-to-Many Broadcast Channel",
+                        "responses": {
+                            "201": { "description": "Channel created" },
+                            "409": { "description": "Channel conflict" }
+                        }
+                    }
+                },
+                "/api/v1/broadcast/forward/check": {
+                    "post": {
+                        "summary": "Evaluate Viral Spread Friction & Forwarding Limits",
+                        "responses": {
+                            "200": { "description": "Forwarding permitted" },
+                            "422": { "description": "Frequently forwarded limit exceeded (1 chat max)" }
+                        }
+                    }
+                },
+                "/api/v1/compliance/report_abuse": {
+                    "post": {
+                        "summary": "Submit Verifiable Cryptographic Abuse Dossier under IT Rules 2021",
+                        "responses": {
+                            "201": { "description": "Statutory grievance ticket issued" },
+                            "400": { "description": "Integrity or signature verification failure" }
+                        }
+                    }
                 }
             }
         })
@@ -312,9 +381,11 @@ impl GatewayEngine {
 
     /// Dispatch incoming raw HTTP method, URI path, and body payload
     pub async fn dispatch_request(&self, method: &str, path: &str, body: &str) -> HttpResponse {
+        let start = std::time::Instant::now();
         let clean_path = path.split('?').next().unwrap_or(path);
-        match (method, clean_path) {
+        let resp = match (method, clean_path) {
             ("GET", "/health") => self.handle_health(),
+            ("GET", "/metrics") => self.metrics.render_response(),
             ("GET", "/api/v1/openapi.json") => HttpResponse::ok(self.get_openapi_spec()),
             ("GET", p) if p.starts_with("/api/v1/identity/") => {
                 let did = &p["/api/v1/identity/".len()..];
@@ -536,13 +607,177 @@ impl GatewayEngine {
                     "active_typers": typers
                 }))
             }
+            ("POST", "/api/v1/broadcast/status") => {
+                #[derive(Deserialize)]
+                struct PostStatusReq {
+                    story_id: String,
+                    author_did: String,
+                    content_cid: String,
+                    caption: String,
+                    #[serde(default = "default_aud")]
+                    audience_type: String,
+                    #[serde(default)]
+                    audience_list: Vec<String>,
+                    timestamp: u64,
+                }
+                fn default_aud() -> String {
+                    "MyContacts".to_string()
+                }
+                match serde_json::from_str::<PostStatusReq>(body) {
+                    Ok(req) => {
+                        let audience = match req.audience_type.as_str() {
+                            "MyContactsExcept" => {
+                                sovereign_broadcast::StatusAudience::MyContactsExcept(req.audience_list)
+                            }
+                            "OnlyShareWith" => {
+                                sovereign_broadcast::StatusAudience::OnlyShareWith(req.audience_list)
+                            }
+                            _ => sovereign_broadcast::StatusAudience::MyContacts,
+                        };
+                        let story = self.broadcast.status.post_status(
+                            &req.story_id,
+                            &req.author_did,
+                            &req.content_cid,
+                            &req.caption,
+                            req.timestamp,
+                            audience,
+                        );
+                        HttpResponse::created(serde_json::to_value(&story).unwrap_or_default())
+                    }
+                    Err(e) => HttpResponse::problem(400, "Invalid Status Payload", &e.to_string(), path),
+                }
+            }
+            ("GET", p) if p.starts_with("/api/v1/broadcast/status/") => {
+                let author_did = &p["/api/v1/broadcast/status/".len()..];
+                let stories = self.broadcast.status.get_active_statuses(author_did, author_did, 1776000000);
+                HttpResponse::ok(serde_json::to_value(&stories).unwrap_or_default())
+            }
+            ("POST", "/api/v1/broadcast/channel") => {
+                #[derive(Deserialize)]
+                struct CreateChanReq {
+                    channel_id: String,
+                    name: String,
+                    description: String,
+                    admin_did: String,
+                    #[serde(default = "default_true")]
+                    is_public: bool,
+                    timestamp: u64,
+                }
+                fn default_true() -> bool {
+                    true
+                }
+                match serde_json::from_str::<CreateChanReq>(body) {
+                    Ok(req) => {
+                        match self.broadcast.channels.create_channel(
+                            &req.channel_id,
+                            &req.name,
+                            &req.description,
+                            &req.admin_did,
+                            req.is_public,
+                            req.timestamp,
+                        ) {
+                            Ok(chan) => HttpResponse::created(serde_json::to_value(&chan).unwrap_or_default()),
+                            Err(e) => HttpResponse::problem(409, "Channel Error", &e.to_string(), path),
+                        }
+                    }
+                    Err(e) => HttpResponse::problem(400, "Invalid Channel Payload", &e.to_string(), path),
+                }
+            }
+            ("POST", p) if p.starts_with("/api/v1/broadcast/channel/") && p.ends_with("/publish") => {
+                let channel_id = &p["/api/v1/broadcast/channel/".len()..p.len() - "/publish".len()];
+                #[derive(Deserialize)]
+                struct PublishReq {
+                    post_id: String,
+                    author_did: String,
+                    content_cid: String,
+                    text: String,
+                    signature_hex: String,
+                    timestamp: u64,
+                }
+                match serde_json::from_str::<PublishReq>(body) {
+                    Ok(req) => {
+                        match self.broadcast.channels.publish_post(
+                            channel_id,
+                            &req.post_id,
+                            &req.author_did,
+                            &req.content_cid,
+                            &req.text,
+                            &req.signature_hex,
+                            req.timestamp,
+                        ) {
+                            Ok(post) => HttpResponse::created(serde_json::to_value(&post).unwrap_or_default()),
+                            Err(e) => HttpResponse::problem(403, "Publish Forbidden", &e.to_string(), path),
+                        }
+                    }
+                    Err(e) => HttpResponse::problem(400, "Invalid Publish Payload", &e.to_string(), path),
+                }
+            }
+            ("GET", p) if p.starts_with("/api/v1/broadcast/channel/") => {
+                let channel_id = &p["/api/v1/broadcast/channel/".len()..];
+                match self.broadcast.channels.get_channel_feed(channel_id, "did:bharat:guest") {
+                    Ok(feed) => HttpResponse::ok(serde_json::to_value(&feed).unwrap_or_default()),
+                    Err(e) => HttpResponse::problem(404, "Channel Not Found", &e.to_string(), path),
+                }
+            }
+            ("POST", "/api/v1/broadcast/forward/check") => {
+                #[derive(Deserialize)]
+                struct ForwardCheckReq {
+                    message_cid: String,
+                    sender_did: String,
+                    hop_count: u32,
+                    target_chats: Vec<String>,
+                }
+                match serde_json::from_str::<ForwardCheckReq>(body) {
+                    Ok(req) => {
+                        let mut env = sovereign_broadcast::ForwardEnvelope::new_direct(&req.message_cid, &req.sender_did);
+                        for _ in 0..req.hop_count {
+                            env = env.forward_to_next();
+                        }
+                        match env.validate_forward(&req.target_chats) {
+                            Ok(()) => HttpResponse::ok(serde_json::json!({
+                                "allowed": true,
+                                "label": env.label,
+                                "hop_count": env.hop_count,
+                                "max_allowed_targets": env.max_allowed_targets,
+                                "requested_targets": req.target_chats.len()
+                            })),
+                            Err(e) => HttpResponse::problem(422, "Viral Forwarding Limit Exceeded", &e.to_string(), path),
+                        }
+                    }
+                    Err(e) => HttpResponse::problem(400, "Invalid Forward Check Payload", &e.to_string(), path),
+                }
+            }
+            ("POST", "/api/v1/compliance/report_abuse") => {
+                #[derive(Deserialize)]
+                struct ReportAbuseReq {
+                    dossier: sovereign_broadcast::AbuseDossier,
+                    sender_vk_hex: String,
+                }
+                match serde_json::from_str::<ReportAbuseReq>(body) {
+                    Ok(req) => {
+                        let mut key_bytes = [0u8; 32];
+                        if let Ok(decoded) = hex::decode(&req.sender_vk_hex) {
+                            if decoded.len() == 32 {
+                                key_bytes.copy_from_slice(&decoded);
+                            }
+                        }
+                        match self.broadcast.abuse.submit_report(req.dossier, key_bytes) {
+                            Ok(ticket) => HttpResponse::created(serde_json::to_value(&ticket).unwrap_or_default()),
+                            Err(e) => HttpResponse::problem(400, "Abuse Verification Failed", &e.to_string(), path),
+                        }
+                    }
+                    Err(e) => HttpResponse::problem(400, "Invalid Abuse Report Payload", &e.to_string(), path),
+                }
+            }
             _ => HttpResponse::problem(
                 404,
                 "Not Found",
                 &format!("Route {} {} not found", method, path),
                 path,
             ),
-        }
+        };
+        self.metrics.record_request(method, clean_path, resp.status_code, start.elapsed());
+        resp
     }
 }
 

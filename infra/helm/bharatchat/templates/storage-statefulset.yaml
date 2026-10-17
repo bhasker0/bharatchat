@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  serviceName: {{ include "bharatchat.fullname" . }}-storage
+  replicas: {{ .Values.storage.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: storage
+  template:
+    metadata:
+      labels:
+        {{- include "bharatchat.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: storage
+      annotations:
+        sovereign.in/jurisdiction: {{ .Values.global.jurisdiction | quote }}
+    spec:
+      serviceAccountName: {{ include "bharatchat.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: storage
+          image: "{{ .Values.storage.image.repository }}:{{ .Values.storage.image.tag }}"
+          imagePullPolicy: {{ .Values.storage.image.pullPolicy }}
+          ports:
+            - name: storage-api
+              containerPort: {{ .Values.storage.service.port }}
+              protocol: TCP
+          env:
+            - name: STORAGE_PORT
+              value: "{{ .Values.storage.service.port }}"
+            - name: MEDIA_STORE_PATH
+              value: "/var/lib/bharatchat/media"
+            - name: SOVEREIGN_JURISDICTION
+              value: {{ .Values.global.jurisdiction | quote }}
+          volumeMounts:
+            - name: media-data
+              mountPath: /var/lib/bharatchat/media
+          resources:
+            {{- toYaml .Values.storage.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+  {{- if .Values.storage.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: media-data
+        labels:
+          {{- include "bharatchat.labels" . | nindent 10 }}
+      spec:
+        accessModes: [ {{ .Values.storage.persistence.accessMode | quote }} ]
+        storageClassName: {{ .Values.storage.persistence.storageClass | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.storage.persistence.size | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-storage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  type: {{ .Values.storage.service.type }}
+  ports:
+    - port: {{ .Values.storage.service.port }}
+      targetPort: storage-api
+      protocol: TCP
+      name: storage-api
+  selector:
+    {{- include "bharatchat.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: storage

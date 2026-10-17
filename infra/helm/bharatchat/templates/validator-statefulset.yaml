@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-validator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: validator
+spec:
+  serviceName: {{ include "bharatchat.fullname" . }}-validator-headless
+  replicas: {{ .Values.validator.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: validator
+  template:
+    metadata:
+      labels:
+        {{- include "bharatchat.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: validator
+      annotations:
+        sovereign.in/jurisdiction: {{ .Values.global.jurisdiction | quote }}
+    spec:
+      serviceAccountName: {{ include "bharatchat.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: validator
+          image: "{{ .Values.validator.image.repository }}:{{ .Values.validator.image.tag }}"
+          imagePullPolicy: {{ .Values.validator.image.pullPolicy }}
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.validator.service.port }}
+              protocol: TCP
+            - name: p2p
+              containerPort: 30303
+              protocol: TCP
+          env:
+            - name: DATA_DIR
+              value: "/var/lib/bharatchat/chain"
+            - name: SOVEREIGN_JURISDICTION
+              value: {{ .Values.global.jurisdiction | quote }}
+          volumeMounts:
+            - name: chain-data
+              mountPath: /var/lib/bharatchat/chain
+          resources:
+            {{- toYaml .Values.validator.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+  {{- if .Values.validator.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: chain-data
+        labels:
+          {{- include "bharatchat.labels" . | nindent 10 }}
+      spec:
+        accessModes: [ {{ .Values.validator.persistence.accessMode | quote }} ]
+        storageClassName: {{ .Values.validator.persistence.storageClass | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.validator.persistence.size | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-validator-headless
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: validator
+spec:
+  clusterIP: None
+  ports:
+    - port: {{ .Values.validator.service.port }}
+      name: rpc
+    - port: 30303
+      name: p2p
+  selector:
+    {{- include "bharatchat.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: validator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-validator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: validator
+spec:
+  type: {{ .Values.validator.service.type }}
+  ports:
+    - port: {{ .Values.validator.service.port }}
+      targetPort: rpc
+      protocol: TCP
+      name: rpc
+  selector:
+    {{- include "bharatchat.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: validator

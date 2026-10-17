@@ -1,0 +1,163 @@
+{{- if .Values.networkPolicy.enabled }}
+# 1. Default Deny all ingress and egress traffic in the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-default-deny-all
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# 2. Allow CoreDNS egress for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-allow-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# 3. Allow ingress to Gateway from Ingress Controller & inter-component egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-gateway-policy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Ingress Controller or Prometheus Scraper
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.gateway.service.port }}
+  egress:
+    # Allow to Ephemeral Relay
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: relay
+      ports:
+        - protocol: TCP
+          port: {{ .Values.relay.service.port }}
+    # Allow to Storage Cluster
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: storage
+      ports:
+        - protocol: TCP
+          port: {{ .Values.storage.service.port }}
+    # Allow to Consortium Validators
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: validator
+      ports:
+        - protocol: TCP
+          port: {{ .Values.validator.service.port }}
+---
+# 4. Allow Ephemeral Relay ingress only from Gateway and peer Relays
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-relay-policy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: relay
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: gateway
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: relay
+      ports:
+        - protocol: TCP
+          port: {{ .Values.relay.service.port }}
+---
+# 5. Allow Validator P2P synchronization and RPC
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-validator-policy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: validator
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: validator
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: gateway
+      ports:
+        - protocol: TCP
+          port: {{ .Values.validator.service.port }}
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: validator
+      ports:
+        - protocol: TCP
+          port: 30303
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "bharatchat.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: validator
+      ports:
+        - protocol: TCP
+          port: 30303
+{{- end }}

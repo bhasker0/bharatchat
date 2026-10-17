@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "bharatchat.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+        sovereign.in/jurisdiction: {{ .Values.global.jurisdiction | quote }}
+    spec:
+      serviceAccountName: {{ include "bharatchat.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.service.port }}
+              protocol: TCP
+          env:
+            - name: SOVEREIGN_HOST
+              value: "0.0.0.0"
+            - name: SOVEREIGN_PORT
+              value: "{{ .Values.gateway.service.port }}"
+            - name: SOVEREIGN_JURISDICTION
+              value: {{ .Values.global.jurisdiction | quote }}
+            - name: EPHEMERAL_RELAY_URL
+              value: "http://{{ include "bharatchat.fullname" . }}-relay:{{ .Values.relay.service.port }}"
+            - name: STORAGE_NODE_URL
+              value: "http://{{ include "bharatchat.fullname" . }}-storage:{{ .Values.storage.service.port }}"
+            - name: VALIDATOR_NODE_URL
+              value: "http://{{ include "bharatchat.fullname" . }}-validator:{{ .Values.validator.service.port }}"
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.gateway.probes.liveness | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.gateway.probes.readiness | nindent 12 }}

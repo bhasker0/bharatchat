@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-sfu
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sfu
+spec:
+  replicas: {{ .Values.sfu.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bharatchat.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sfu
+  template:
+    metadata:
+      labels:
+        {{- include "bharatchat.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: sfu
+      annotations:
+        sovereign.in/jurisdiction: {{ .Values.global.jurisdiction | quote }}
+    spec:
+      serviceAccountName: {{ include "bharatchat.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: sfu
+          image: "{{ .Values.sfu.image.repository }}:{{ .Values.sfu.image.tag }}"
+          imagePullPolicy: {{ .Values.sfu.image.pullPolicy }}
+          ports:
+            - name: sfu-signaling
+              containerPort: {{ .Values.sfu.service.port }}
+              protocol: TCP
+            - name: sfu-rtp
+              containerPort: 7001
+              protocol: UDP
+          env:
+            - name: SFU_PORT
+              value: "{{ .Values.sfu.service.port }}"
+            - name: MAX_CALL_PARTICIPANTS
+              value: "32"
+            - name: SOVEREIGN_JURISDICTION
+              value: {{ .Values.global.jurisdiction | quote }}
+          resources:
+            {{- toYaml .Values.sfu.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bharatchat.fullname" . }}-sfu
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bharatchat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sfu
+spec:
+  type: {{ .Values.sfu.service.type }}
+  ports:
+    - port: {{ .Values.sfu.service.port }}
+      targetPort: sfu-signaling
+      protocol: TCP
+      name: sfu-signaling
+    - port: 7001
+      targetPort: sfu-rtp
+      protocol: UDP
+      name: sfu-rtp
+  selector:
+    {{- include "bharatchat.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: sfu
