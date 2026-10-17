@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use sovereign_core::staking::{MICROSTAKE_PER_RECIPIENT_PAISE, MAXIMUM_SPAM_TOLERANCE_RATIO, PENALTY_SUSPENSION_DURATION_SEC};
 
+pub mod block;
+pub use block::{BlockError, ConsortiumBlock, ConsortiumBlockchain, ConsortiumTx, ValidatorSignature};
+
 #[derive(Error, Debug)]
 pub enum ChainError {
     #[error("DID already registered: {0}")]

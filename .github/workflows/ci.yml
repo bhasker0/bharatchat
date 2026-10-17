@@ -37,7 +37,7 @@ jobs:
       - name: Workspace Compilation Check
         run: cargo check --workspace --all-targets
 
-      - name: Execute Workspace Test Suite (39 Tests across 15 Crates)
+      - name: Execute Workspace Test Suite (41 Tests across 15 Crates)
         run: cargo test --workspace --verbose
 
       - name: Execute Cryptographic Performance Benchmarks
