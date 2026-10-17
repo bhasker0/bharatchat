@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sovereign-zero-trust-isolation
+  namespace: sovereign-prod
+spec:
+  podSelector: {} # Applies to all pods in sovereign-prod namespace
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 1. Ephemeral relay accepts external inbound WebSocket connections from clients
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8080
+    # 2. Internal microservices communicate strictly within the namespace
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: bharatchat-sovereign
+      ports:
+        - protocol: TCP
+          port: 9944 # Consortium RPC
+        - protocol: TCP
+          port: 7000 # Storage API
+  egress:
+    # Allow internal communication between cluster components
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: bharatchat-sovereign
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow NPCI UPI switch endpoints (strictly inside India)
+    - to:
+        - ipBlock:
+            cidr: 103.0.0.0/8 # Indian IP allocation block
+      ports:
+        - protocol: TCP
+          port: 443

@@ -660,6 +660,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-mls"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "blake3",
+ "hex",
+ "rand",
+ "serde",
+ "serde_json",
+ "sovereign-core",
+ "thiserror",
+]
+
+[[package]]
+name = "sovereign-multidevice"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "blake3",
+ "hex",
+ "rand",
+ "serde",
+ "serde_json",
+ "sovereign-core",
+ "thiserror",
+ "x25519-dalek",
+]
+
+[[package]]
 name = "sovereign-relay"
 version = "0.1.0"
 dependencies = [

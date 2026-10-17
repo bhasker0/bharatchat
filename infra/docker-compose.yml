@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # 1. Permissioned Consortium Blockchain Validator Node
+  consortium-validator:
+    image: sovereign/chain-node:latest
+    container_name: sovereign-validator-node1
+    environment:
+      - NODE_ROLE=validator
+      - JURISDICTION=INDIA_MUMBAI
+      - CHAIN_ID=bharat-consortium-mainnet-1
+      - RPC_PORT=9944
+      - P2P_PORT=30333
+    ports:
+      - "9944:9944"
+      - "30333:30333"
+    volumes:
+      - validator-data:/data
+    restart: unless-stopped
+    networks:
+      - sovereign-internal
+
+  # 2. Ephemeral Message Relay Mesh (Zero Disk Retention)
+  ephemeral-relay:
+    image: sovereign/relay-node:latest
+    container_name: sovereign-relay-mesh
+    environment:
+      - RELAY_LISTEN_PORT=8080
+      - EPHEMERAL_TTL_SECONDS=604800 # 7 days max memory buffer
+      - ZERO_DISK_RETENTION=true
+      - RULE_4_2_ENVELOPE_ENFORCEMENT=strict
+      - CONSORTIUM_RPC_URL=ws://consortium-validator:9944
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - sovereign-internal
+
+  # 3. Off-Chain Chunked Storage Node (MinIO / Ceph local Indian cluster)
+  storage-node:
+    image: minio/minio:latest
+    container_name: sovereign-storage-node
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=sovereign_admin
+      - MINIO_ROOT_PASSWORD=sovereign_secure_pass_2026
+      - MINIO_REGION_NAME=in-west-mumbai
+      - DATA_JURISDICTION=INDIA_LOCALIZED_MUMBAI_BLR
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-storage-data:/data
+    restart: unless-stopped
+    networks:
+      - sovereign-internal
+
+  # 4. WebRTC SFrame SFU Media Relay (Audio/Video Calling up to 32 participants)
+  sfu-media-relay:
+    image: sovereign/calls-sfu:latest
+    container_name: sovereign-sfu-calling
+    environment:
+      - SFRAME_KEY_EPOCH_MANAGEMENT=true
+      - MAX_PARTICIPANTS_PER_ROOM=32
+      - RTC_PORT_RANGE=40000-40100/udp
+    ports:
+      - "8443:8443"
+      - "40000-40100:40000-40100/udp"
+    restart: unless-stopped
+    networks:
+      - sovereign-internal
+
+volumes:
+  validator-data:
+  minio-storage-data:
+
+networks:
+  sovereign-internal:
+    driver: bridge

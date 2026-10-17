@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sovereign-storage-nodes
+  namespace: sovereign-prod
+  labels:
+    app.kubernetes.io/name: encrypted-storage
+    app.kubernetes.io/part-of: bharatchat-sovereign
+spec:
+  serviceName: sovereign-storage-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: encrypted-storage
+  template:
+    metadata:
+      labels:
+        app: encrypted-storage
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/region
+                    operator: In
+                    values: ["ap-south-1"]
+      containers:
+        - name: chunk-node
+          image: sovereign/storage-chunker:v1.0.0
+          env:
+            - name: DATA_JURISDICTION
+              value: "INDIA_LOCALIZED_MUMBAI_BLR"
+            - name: CHUNK_SIZE_BYTES
+              value: "262144" # 256 KB
+            - name: CASCADE_PURGE_ENABLED
+              value: "true"
+          ports:
+            - name: storage-api
+              containerPort: 7000
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          volumeMounts:
+            - name: chunk-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: chunk-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sovereign-storage-service
+  namespace: sovereign-prod
+spec:
+  selector:
+    app: encrypted-storage
+  ports:
+    - name: storage-api
+      port: 7000
+      targetPort: 7000
+  type: ClusterIP

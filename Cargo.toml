@@ -11,4 +11,6 @@ members = [
     "crates/sovereign-upi",
     "crates/sovereign-commerce",
     "crates/sovereign-e2e",
+    "crates/sovereign-multidevice",
+    "crates/sovereign-mls",
 ]

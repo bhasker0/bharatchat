@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sovereign-consortium-validator
+  namespace: sovereign-prod
+  labels:
+    app.kubernetes.io/name: consortium-validator
+    app.kubernetes.io/part-of: bharatchat-sovereign
+spec:
+  serviceName: consortium-validator-headless
+  replicas: 4
+  selector:
+    matchLabels:
+      app: consortium-validator
+  template:
+    metadata:
+      labels:
+        app: consortium-validator
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/region
+                    operator: In
+                    values: ["ap-south-1", "me-central-1-in"]
+      containers:
+        - name: validator
+          image: sovereign/chain-node:v1.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: JURISDICTION
+              value: "INDIA_MUMBAI_BLR"
+            - name: DATA_RESIDENCY_STRICT
+              value: "true"
+          ports:
+            - name: rpc
+              containerPort: 9944
+            - name: p2p
+              containerPort: 30333
+          resources:
+            requests:
+              cpu: "2000m"
+              memory: "4Gi"
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+          livenessProbe:
+            tcpSocket:
+              port: 9944
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9944
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          volumeMounts:
+            - name: chain-storage
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: chain-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 200Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consortium-rpc-service
+  namespace: sovereign-prod
+spec:
+  selector:
+    app: consortium-validator
+  ports:
+    - name: rpc
+      port: 9944
+      targetPort: 9944
+  type: ClusterIP

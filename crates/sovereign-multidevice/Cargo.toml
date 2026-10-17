@@ -1,0 +1,16 @@
+[package]
+name = "sovereign-multidevice"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-Device Companion Mode (SESAME Protocol) for Primary-Secondary Key Provisioning & Sync"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+blake3 = "1.5"
+hex = "0.4"
+rand = "0.8"
+aes-gcm = { version = "0.10", features = ["aes"] }
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
