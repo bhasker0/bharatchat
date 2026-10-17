@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package sovereign.consent.v1;
+
+// DPDP Act 2023 Explicit Consent State
+message ConsentRecord {
+  string data_principal_did = 1;
+  string data_fiduciary_did = 2;
+  enum ConsentScope {
+    SCOPE_UNSPECIFIED = 0;
+    TRANSACTIONAL_NOTIFICATIONS = 1;
+    MARKETING_BROADCASTS = 2;
+    COMMERCE_UPDATES = 3;
+  }
+  ConsentScope scope = 3;
+  enum ConsentStatus {
+    STATUS_UNSPECIFIED = 0;
+    ACTIVE_OPTED_IN = 1;
+    REVOKED_OPTED_OUT = 2;
+    EXPIRED = 3;
+  }
+  ConsentStatus status = 4;
+  uint64 granted_timestamp = 5;
+  uint64 expiry_timestamp = 6;
+  bytes consent_signature = 7;
+}
+
+// Business Broadcast with Anti-Spam Micro-Staking
+message BusinessBroadcastIntent {
+  string broadcast_id = 1;
+  string business_did = 2;
+  uint64 recipient_count = 3;
+  uint64 locked_microstake_paise = 4; // Stake in paise (1 INR = 100 paise)
+  bytes content_cid = 5;
+  uint64 broadcast_timestamp = 6;
+  bytes business_signature = 7;
+}
+
+// Anti-Spam Slashing Verdict
+message SlashingEvent {
+  string broadcast_id = 1;
+  string business_did = 2;
+  uint64 total_recipients = 3;
+  uint64 spam_reports_received = 4;
+  double spam_ratio = 5;               // E.g., 0.045 = 4.5%
+  uint64 slashed_stake_paise = 6;
+  uint64 burned_amount_paise = 7;
+  uint64 integrity_pool_paise = 8;
+  uint64 suspension_until_timestamp = 9;
+}

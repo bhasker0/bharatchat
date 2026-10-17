@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package sovereign.compliance.v1;
+
+// Rule 4(2) First-Originator Judicial Warrant Request
+message Rule42WarrantRequest {
+  string warrant_reference_id = 1;
+  string competent_authority = 2;    // High Court / Designated Ministry
+  string statutory_provision = 3;     // Section 69A IT Act / Rule 4(2)
+  bytes target_content_cid = 4;      // BLAKE3 hash of flagged media/text
+  uint64 issuance_timestamp = 5;
+  bytes court_seal_signature = 6;
+}
+
+// Partial key decryption share from an authorized threshold custodian
+message ThresholdDecryptionShare {
+  string warrant_reference_id = 1;
+  enum CustodianRole {
+    ROLE_UNSPECIFIED = 0;
+    RESIDENT_GRIEVANCE_OFFICER = 1;
+    CHIEF_COMPLIANCE_OFFICER = 2;
+    JUDICIAL_REGISTRY_ESCROW = 3;
+    HARDWARE_SECURITY_MODULE = 4;
+  }
+  CustodianRole custodian_role = 2;
+  bytes partial_key_share = 3;
+  uint64 approval_timestamp = 4;
+  bytes custodian_signature = 5;
+}
+
+// Judicial Output: Certified First-Originator Identification
+message OriginatorResolutionReport {
+  string warrant_reference_id = 1;
+  bytes target_content_cid = 2;
+  string first_originator_did = 3;
+  uint64 first_origination_timestamp = 4;
+  bytes cryptographic_attestation = 5;
+}
+
+// DPDP Act 2023 Section 12 Right to Erasure Request
+message DpdpErasureRequest {
+  string request_id = 1;
+  string data_principal_did = 2;
+  enum ErasureScope {
+    FULL_ACCOUNT_AND_MEDIA = 0;
+    OFFCHAIN_BACKUPS_ONLY = 1;
+    MARKETING_CONSENT_ONLY = 2;
+  }
+  ErasureScope scope = 3;
+  uint64 requested_timestamp = 4;
+  bytes principal_signature = 5;
+}
+
+// Cryptographic Proof of Shredding
+message CryptoShreddingConfirmation {
+  string request_id = 1;
+  string data_principal_did = 2;
+  string destroyed_key_id = 3;
+  uint32 storage_blocks_unpinned = 4;
+  uint64 completion_timestamp = 5;
+  bytes ledger_anchor_tx_hash = 6;
+}

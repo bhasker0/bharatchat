@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package sovereign.messaging.v1;
+
+// Core End-to-End Encrypted Message Packet
+message EncryptedMessagePacket {
+  string sender_did = 1;
+  string recipient_did = 2;
+  bytes ephemeral_public_key = 3; // X25519 ephemeral for ratchet step
+  uint64 sequence_number = 4;
+  bytes ciphertext = 5;          // AES-256-GCM encrypted payload
+  bytes nonce = 6;
+  TraceabilityEnvelope trace_envelope = 7; // Encrypted Rule 4(2) token
+  repeated ForwardHopProof forward_chain = 8;
+  bytes packet_signature = 9;    // Sender Ed25519 signature over envelope + ciphertext
+}
+
+// Traceability Envelope (Rule 4(2) IT Rules 2021)
+// Decryptable ONLY via threshold multi-sig with judicial warrant
+message TraceabilityEnvelope {
+  uint32 version = 1;
+  bytes content_cid = 2;              // BLAKE3 hash of canonical plaintext
+  bytes encrypted_metadata = 3;       // HPKE-sealed OriginatorMetadata
+  bytes ephemeral_kem_pubkey = 4;     // KEM public key for legal threshold PK
+  bytes tag = 5;
+}
+
+// Originator Metadata sealed inside TraceabilityEnvelope
+message OriginatorMetadata {
+  string originator_did = 1;
+  bytes canonical_content_hash = 2;
+  uint64 creation_timestamp = 3;
+  bytes randomness_nonce = 4;
+  bytes originator_signature = 5;     // Ed25519 signature of (canonical_content_hash || timestamp)
+}
+
+// Preserved attestation when forwarding without re-originating
+message ForwardHopProof {
+  string forwarder_did = 1;
+  bytes parent_envelope_hash = 2;
+  uint32 hop_count = 3;
+  uint64 forward_timestamp = 4;
+  bytes forwarder_signature = 5;
+}
