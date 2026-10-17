@@ -674,6 +674,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-gateway"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hex",
+ "serde",
+ "serde_json",
+ "sovereign-chain",
+ "sovereign-commerce",
+ "sovereign-core",
+ "sovereign-e2e",
+ "sovereign-relay",
+ "sovereign-storage",
+ "sovereign-upi",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "sovereign-mls"
 version = "0.1.0"
 dependencies = [

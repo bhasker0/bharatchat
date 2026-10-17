@@ -1,0 +1,20 @@
+[package]
+name = "sovereign-gateway"
+version = "0.1.0"
+edition = "2021"
+description = "High-Concurrency OpenAPI 3.1 REST/JSON Microservice Gateway for Sovereign Communication Platform"
+
+[dependencies]
+sovereign-core = { path = "../sovereign-core" }
+sovereign-chain = { path = "../sovereign-chain" }
+sovereign-relay = { path = "../sovereign-relay" }
+sovereign-storage = { path = "../sovereign-storage" }
+sovereign-commerce = { path = "../sovereign-commerce" }
+sovereign-upi = { path = "../sovereign-upi" }
+sovereign-e2e = { path = "../sovereign-e2e" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+hex = "0.4"
+blake3 = "1.5"
