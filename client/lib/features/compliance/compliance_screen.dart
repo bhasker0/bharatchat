@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/i18n/app_localizations.dart';
+import '../auth/auth_state.dart';
 
 class ComplianceScreen extends ConsumerStatefulWidget {
   const ComplianceScreen({super.key});
@@ -57,6 +58,8 @@ class _ComplianceScreenState extends ConsumerState<ComplianceScreen> {
   @override
   Widget build(BuildContext context) {
     final currentLang = ref.watch(languageProvider);
+    final authUser = ref.watch(authProvider).user;
+    final activeDid = accountErased ? "REVOKED_AND_PURGED" : (authUser?.did ?? did);
 
     return Scaffold(
       appBar: AppBar(
@@ -65,6 +68,37 @@ class _ComplianceScreenState extends ConsumerState<ComplianceScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (authUser != null)
+            Card(
+              color: AppTheme.surfaceDark,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: AppTheme.primaryGreen,
+                  child: Icon(Icons.verified_user, color: Colors.white),
+                ),
+                title: Text(
+                  authUser.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                subtitle: Text(
+                  "${authUser.phone} • ${authUser.jurisdiction}",
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    "AUTHENTICATED",
+                    style: TextStyle(fontSize: 10, color: AppTheme.primaryGreen, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
           // Eighth Schedule Localization (DPDP Act 2023 Sec 5)
           Card(
             color: AppTheme.surfaceDark,
@@ -140,7 +174,7 @@ class _ComplianceScreenState extends ConsumerState<ComplianceScreen> {
           const SizedBox(height: 12),
           _buildCard(
             title: "W3C Sovereign Identity (DID)",
-            subtitle: did,
+            subtitle: activeDid,
             icon: Icons.fingerprint,
             badgeColor: accountErased ? Colors.red : AppTheme.primaryGreen,
             badgeText: accountErased ? "REVOKED & PURGED" : "ACTIVE ON-CHAIN",
@@ -203,6 +237,20 @@ class _ComplianceScreenState extends ConsumerState<ComplianceScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.orange,
+              side: const BorderSide(color: Colors.orange, width: 1.2),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.logout),
+            label: const Text("Sign Out of Sovereign Session"),
+            onPressed: () {
+              ref.read(authProvider.notifier).signOut();
+            },
+          ),
         ],
       ),
     );

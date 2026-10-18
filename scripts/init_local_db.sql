@@ -107,3 +107,29 @@ CREATE TABLE IF NOT EXISTS media_chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_owner ON media_chunks(owner_did);
+
+-- 9. Persistent Chat Messages
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id VARCHAR(128) PRIMARY KEY,
+    sender_did VARCHAR(128) NOT NULL,
+    recipient_did VARCHAR(128) NOT NULL,
+    text TEXT NOT NULL,
+    timestamp BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_recipient ON chat_messages(recipient_did, timestamp);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_did, timestamp);
+
+-- 10. Persistent Call Logs (Audio / Video / Group SFrame)
+CREATE TABLE IF NOT EXISTS call_logs (
+    id VARCHAR(128) PRIMARY KEY,
+    caller_did VARCHAR(128) NOT NULL,
+    recipient_did VARCHAR(128) NOT NULL,
+    call_type VARCHAR(32) NOT NULL DEFAULT 'AUDIO',
+    status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
+    duration_seconds INT NOT NULL DEFAULT 0,
+    timestamp BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_call_logs_caller ON call_logs(caller_did, timestamp);
+CREATE INDEX IF NOT EXISTS idx_call_logs_recipient ON call_logs(recipient_did, timestamp);

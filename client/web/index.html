@@ -19,6 +19,9 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="BharatChat Sovereign Client">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,6 +34,15 @@
 
   <title>BharatChat Sovereign</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var i = 0; i < registrations.length; i++) {
+          registrations[i].update();
+        }
+      });
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

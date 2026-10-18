@@ -2,242 +2,88 @@
 set -eo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DATA_DIR="${REPO_ROOT}/data"
-PID_FILE="${DATA_DIR}/gateway.pid"
-LOG_FILE="${DATA_DIR}/gateway.log"
-GATEWAY_BIN="${REPO_ROOT}/target/release/sovereign-gateway"
 
-mkdir -p "${DATA_DIR}/postgres" "${DATA_DIR}/redis" "${DATA_DIR}/storage"
+SCRIPT_DB="${REPO_ROOT}/scripts/db.sh"
+SCRIPT_BACKEND="${REPO_ROOT}/scripts/backend.sh"
+SCRIPT_FRONTEND="${REPO_ROOT}/scripts/frontend.sh"
 
-get_lan_ip() {
-    ip -4 addr show scope global | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1 || echo "127.0.0.1"
-}
-
-start_db() {
-    echo "=== [1/3] Starting Local Sovereign Database Containers ==="
-    # 1. PostgreSQL 16
-    if podman ps --filter "name=bharatchat-postgres" --format "{{.Names}}" | grep -q "bharatchat-postgres"; then
-        echo "      PostgreSQL container 'bharatchat-postgres' is already running."
-    else
-        echo "      Launching PostgreSQL 16 container 'bharatchat-postgres' on port 5432..."
-        podman run -d --name bharatchat-postgres --replace \
-            -p 5432:5432 \
-            -e POSTGRES_DB=bharatchat \
-            -e POSTGRES_USER=bharat_admin \
-            -e POSTGRES_PASSWORD=bharat_secure_pass_2026 \
-            -v "${DATA_DIR}/postgres:/var/lib/postgresql/data:Z" \
-            docker.io/library/postgres:16-alpine >/dev/null
-    fi
-
-    # 2. Redis 7
-    if podman ps --filter "name=bharatchat-cache" --format "{{.Names}}" | grep -q "bharatchat-cache"; then
-        echo "      Redis container 'bharatchat-cache' is already running."
-    else
-        echo "      Launching Redis 7 container 'bharatchat-cache' on port 6379..."
-        podman run -d --name bharatchat-cache --replace \
-            -p 6379:6379 \
-            -v "${DATA_DIR}/redis:/data:Z" \
-            docker.io/library/redis:7-alpine redis-server --appendonly yes >/dev/null
-    fi
-
-    # 3. Wait for PostgreSQL
-    echo "      Waiting for PostgreSQL to accept connections..."
-    for i in {1..20}; do
-        if podman exec bharatchat-postgres pg_isready -U bharat_admin -d bharatchat &>/dev/null; then
-            break
-        fi
-        sleep 1
-    done
-
-    # 4. Provision Schema
-    echo "=== [2/3] Provisioning Database Schema ==="
-    python3 "${REPO_ROOT}/scripts/init_local_db.py"
-}
-
-start_gateway() {
-    echo "=== [3/3] Launching Sovereign Gateway Server ==="
-    if [ -f "${PID_FILE}" ]; then
-        OLD_PID=$(cat "${PID_FILE}")
-        if ps -p "${OLD_PID}" >/dev/null 2>&1; then
-            echo "      Gateway server is already running with PID ${OLD_PID}."
-            return 0
-        fi
-        rm -f "${PID_FILE}"
-    fi
-
-    if [ ! -f "${GATEWAY_BIN}" ]; then
-        echo "      Building release binary..."
-        (cd "${REPO_ROOT}" && cargo build --release -p sovereign-gateway)
-    fi
-
-    export SOVEREIGN_HOST="0.0.0.0"
-    export SOVEREIGN_PORT="8080"
-    export DATA_JURISDICTION="INDIA_LOCALIZED_MUMBAI_BLR"
-
-    echo "      Starting daemon listening on 0.0.0.0:8080..."
-    setsid "${GATEWAY_BIN}" >> "${LOG_FILE}" 2>&1 &
-    NEW_PID=$!
-    disown "${NEW_PID}" 2>/dev/null || true
-    echo "${NEW_PID}" > "${PID_FILE}"
-    echo "      Server process launched with PID ${NEW_PID}."
-
-    # Wait for liveness
-    for i in {1..10}; do
-        if curl -s http://127.0.0.1:8080/health | grep -q "UP"; then
-            echo "      [OK] Server is LIVE and healthy on http://127.0.0.1:8080/health"
-            break
-        fi
-        sleep 1
-    done
-
-    LAN_IP=$(get_lan_ip)
-    echo "============================================================"
-    echo "  BHARATCHAT LOCAL SOVEREIGN SERVER IS RUNNING"
-    echo "============================================================"
-    echo "  Localhost URL: http://127.0.0.1:8080"
-    echo "  Localhost WS : ws://127.0.0.1:8080"
-    echo "  LAN Access   : http://${LAN_IP}:8080"
-    echo "  LAN WS       : ws://${LAN_IP}:8080"
-    echo "  PostgreSQL   : postgresql://bharat_admin:bharat_secure_pass_2026@127.0.0.1:5432/bharatchat"
-    echo "  Redis        : redis://127.0.0.1:6379"
-    echo "  Media Storage: ${DATA_DIR}/storage"
-    echo "  Log File     : ${LOG_FILE}"
-    echo "============================================================"
-}
-
-WEB_PID_FILE="${DATA_DIR}/web.pid"
-WEB_LOG_FILE="${DATA_DIR}/web.log"
-WEB_DIR="${REPO_ROOT}/client/build/web"
-
-start_web() {
-    echo "=== [4/4] Launching Sovereign Web Client UI ==="
-    if [ -f "${WEB_PID_FILE}" ]; then
-        OLD_WEB_PID=$(cat "${WEB_PID_FILE}")
-        if ps -p "${OLD_WEB_PID}" >/dev/null 2>&1; then
-            echo "      Web Client is already running with PID ${OLD_WEB_PID} on port 3000."
-            return 0
-        fi
-        rm -f "${WEB_PID_FILE}"
-    fi
-
-    if [ ! -d "${WEB_DIR}" ]; then
-        echo "      Web bundle not found. Building Flutter Web..."
-        (cd "${REPO_ROOT}/client" && flutter build web --release)
-    fi
-
-    echo "      Starting Web Client UI daemon on 0.0.0.0:3000..."
-    setsid python3 -m http.server 3000 --directory "${WEB_DIR}" >> "${WEB_LOG_FILE}" 2>&1 &
-    NEW_WEB_PID=$!
-    disown "${NEW_WEB_PID}" 2>/dev/null || true
-    echo "${NEW_WEB_PID}" > "${WEB_PID_FILE}"
-    echo "      Web Client process launched with PID ${NEW_WEB_PID}."
-
-    LAN_IP=$(get_lan_ip)
-    echo "      [OK] Web Client is LIVE on http://localhost:3000 and http://${LAN_IP}:3000"
-}
-
-stop_all() {
-    echo "=== Stopping BharatChat Sovereign Server, Web UI & Database ==="
-    if [ -f "${WEB_PID_FILE}" ]; then
-        WPID=$(cat "${WEB_PID_FILE}")
-        if ps -p "${WPID}" >/dev/null 2>&1; then
-            echo "Stopping Web Client UI (PID ${WPID})..."
-            kill "${WPID}" || true
-        fi
-        rm -f "${WEB_PID_FILE}"
-    fi
-
-    if [ -f "${PID_FILE}" ]; then
-        PID=$(cat "${PID_FILE}")
-        if ps -p "${PID}" >/dev/null 2>&1; then
-            echo "Stopping Gateway daemon (PID ${PID})..."
-            kill "${PID}" || true
-            sleep 1
-        fi
-        rm -f "${PID_FILE}"
-    fi
-
-    echo "Stopping container 'bharatchat-postgres'..."
-    podman stop bharatchat-postgres 2>/dev/null || true
-    echo "Stopping container 'bharatchat-cache'..."
-    podman stop bharatchat-cache 2>/dev/null || true
-    echo "[OK] All local services stopped."
-}
-
-show_status() {
-    echo "============================================================"
-    echo "  BHARATCHAT LOCAL SERVER, WEB CLIENT & DATABASE STATUS"
-    echo "============================================================"
-    LAN_IP=$(get_lan_ip)
-    echo "  Computer Local IP: ${LAN_IP}"
-    echo ""
-    echo "--- Database Containers ---"
-    podman ps --filter "name=bharatchat" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || true
-    echo ""
-    echo "--- Gateway Server Daemon ---"
-    if [ -f "${PID_FILE}" ] && ps -p "$(cat "${PID_FILE}")" >/dev/null 2>&1; then
-        echo "  Status : RUNNING (PID $(cat "${PID_FILE}"))"
-        echo "  Ports  : 0.0.0.0:8080 (HTTP/1.1 & WebSocket)"
-        echo "  Health : $(curl -s http://127.0.0.1:8080/health || echo 'Health check failed')"
-    else
-        echo "  Status : STOPPED"
-    fi
-    echo ""
-    echo "--- Web Client UI Daemon ---"
-    if [ -f "${WEB_PID_FILE}" ] && ps -p "$(cat "${WEB_PID_FILE}")" >/dev/null 2>&1; then
-        echo "  Status : RUNNING (PID $(cat "${WEB_PID_FILE}"))"
-        echo "  Local  : http://localhost:3000"
-        echo "  LAN    : http://${LAN_IP}:3000"
-    else
-        echo "  Status : STOPPED"
-    fi
-    echo "============================================================"
-}
+chmod +x "${SCRIPT_DB}" "${SCRIPT_BACKEND}" "${SCRIPT_FRONTEND}" 2>/dev/null || true
 
 case "${1:-status}" in
     start)
-        start_db
-        start_gateway
-        start_web
+        echo "=== [Master Orchestrator] Starting BharatChat Sovereign Stack ==="
+        "${SCRIPT_DB}" start
+        "${SCRIPT_BACKEND}" start
+        "${SCRIPT_FRONTEND}" serve-web
+        echo ""
+        echo "============================================================"
+        echo "  BHARATCHAT THREE-TIER STACK IS LIVE"
+        echo "  - Tier 1 (Database): PostgreSQL :5432 & Redis :6379 (Persistent)"
+        echo "  - Tier 2 (Backend) : Sovereign Gateway :8080 (Data-Preserved)"
+        echo "  - Tier 3 (Frontend): Web UI :3000 & Android Client"
+        echo "============================================================"
         ;;
     stop)
-        stop_all
+        echo "=== [Master Orchestrator] Stopping Frontend & Backend (DB stays preserved) ==="
+        "${SCRIPT_FRONTEND}" stop-web || true
+        "${SCRIPT_BACKEND}" stop || true
+        echo "  [INFO] Database containers & persistent storage remain safe and running."
+        echo "         To stop the database containers as well, run: ./scripts/server_ctl.sh stop-all"
+        ;;
+    stop-all)
+        echo "=== [Master Orchestrator] Stopping All Services ==="
+        "${SCRIPT_FRONTEND}" stop-web || true
+        "${SCRIPT_BACKEND}" stop || true
+        "${SCRIPT_DB}" stop || true
+        echo "  [OK] All services stopped. Data remains safely preserved on disk."
         ;;
     restart)
-        stop_all
-        sleep 2
-        start_db
-        start_gateway
-        start_web
+        echo "=== [Master Orchestrator] Restarting Backend & Frontend (DB zero-downtime) ==="
+        "${SCRIPT_BACKEND}" restart
+        "${SCRIPT_FRONTEND}" restart-web
         ;;
     status)
-        show_status
+        echo "============================================================"
+        echo "  BHARATCHAT THREE-TIER ARCHITECTURE STATUS"
+        echo "============================================================"
+        "${SCRIPT_DB}" status
+        echo ""
+        "${SCRIPT_BACKEND}" status
+        echo ""
+        "${SCRIPT_FRONTEND}" status
         ;;
-    init-db)
-        python3 "${REPO_ROOT}/scripts/init_local_db.py"
+    build-web)
+        "${SCRIPT_FRONTEND}" build-web
+        ;;
+    build-apk)
+        "${SCRIPT_FRONTEND}" build-apk
+        ;;
+    install-apk)
+        "${SCRIPT_FRONTEND}" install-apk
+        ;;
+    db-rows)
+        "${SCRIPT_DB}" rows
+        ;;
+    psql)
+        "${SCRIPT_DB}" psql
         ;;
     health)
-        curl -s http://127.0.0.1:8080/health | python3 -m json.tool || curl -s http://127.0.0.1:8080/health
+        "${SCRIPT_BACKEND}" health
         ;;
     metrics)
-        curl -s http://127.0.0.1:8080/metrics
+        "${SCRIPT_BACKEND}" metrics
         ;;
     logs)
-        tail -f "${LOG_FILE}"
+        "${SCRIPT_BACKEND}" logs
         ;;
     test)
-        echo "Running live verification against http://127.0.0.1:8080..."
-        curl -i -s http://127.0.0.1:8080/health
+        echo "=== Running Sovereign Stack Verification ==="
+        "${SCRIPT_BACKEND}" test
         echo ""
-        curl -i -s -X POST http://127.0.0.1:8080/api/v1/identity \
-            -H "Content-Type: application/json" \
-            -d '{"did":"did:bharat:local_node_owner","vk_hex":"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff","timestamp":1776000000}'
-        echo ""
-        curl -i -s http://127.0.0.1:8080/api/v1/identity/did:bharat:local_node_owner
-        echo ""
+        "${SCRIPT_DB}" rows
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|init-db|health|metrics|logs|test}"
+        echo "Usage: $0 {start|stop|stop-all|restart|status|build-web|build-apk|install-apk|db-rows|psql|health|metrics|logs|test}"
         exit 1
         ;;
 esac

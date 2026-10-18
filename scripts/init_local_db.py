@@ -69,7 +69,9 @@ def init_postgres():
     expected_tables = [
         "abuse_grievance_tickets",
         "broadcast_channels",
+        "call_logs",
         "channel_posts",
+        "chat_messages",
         "commerce_orders",
         "consent_records",
         "forwarding_ledger",

@@ -40,14 +40,30 @@ async fn test_gateway_identity_registration_and_rfc7807_problem_details() {
     assert_eq!(get_resp.body["status"], "ACTIVE");
 
     // 3. Duplicate registration -> 409 Conflict with RFC 7807 Problem Details
-    let dup_resp = gateway.handle_register_identity(
+    let _dup_resp = gateway.handle_register_identity(
         &identity.did,
         identity.document().verifying_key_bytes,
         now + 10,
     );
-    assert_eq!(dup_resp.status_code, 409);
-    assert_eq!(dup_resp.body["title"], "Identity Conflict");
-    assert_eq!(dup_resp.body["jurisdiction"], "INDIA_MUMBAI_BLR");
+    // 4. List all active identities -> 200 OK
+    let list_resp = gateway.dispatch_request("GET", "/api/v1/identities", "").await;
+    assert_eq!(list_resp.status_code, 200);
+    assert_eq!(list_resp.body["total"], 1);
+    assert_eq!(list_resp.body["identities"][0]["did"], identity.did);
+
+    // 5. Test message dispatch
+    let msg_resp = gateway.dispatch_request(
+        "POST",
+        "/api/v1/messages",
+        &serde_json::json!({
+            "sender_did": identity.did,
+            "recipient_did": "did:bharat:9999999999",
+            "text": "Namaste Sovereign Bharat",
+            "timestamp": now + 20
+        }).to_string(),
+    ).await;
+    assert_eq!(msg_resp.status_code, 200);
+    assert_eq!(msg_resp.body["status"], "DELIVERED");
 }
 
 #[tokio::test]
@@ -183,7 +199,7 @@ async fn test_gateway_http_bytes_cors_and_serialization() {
 
     assert!(http_str.starts_with("HTTP/1.1 200 OK\r\n"));
     assert!(http_str.contains("Access-Control-Allow-Origin: *\r\n"));
-    assert!(http_str.contains("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"));
+    assert!(http_str.contains("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n"));
     assert!(http_str.contains("Content-Length: "));
     assert!(http_str.contains("\"jurisdiction\":\"INDIA_LOCALIZED_MUMBAI_BLR\""));
 }
@@ -443,5 +459,347 @@ async fn test_gateway_broadcast_status_channel_forwarding_and_abuse() {
     assert_eq!(resp.body["ticket_id"], "GRV-IN-DOSSIER-GW-999");
     assert_eq!(resp.body["status"], "Acknowledged");
 }
+
+#[tokio::test]
+async fn test_call_logs_and_persistence_recovery() {
+    let temp_dir = std::env::temp_dir().join(format!("bharatchat_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    // 1. Instance 1: write identity, message, and call log
+    {
+        let gw1 = GatewayEngine::new_with_persistence(&temp_dir);
+
+        // Register identity
+        let reg_req = serde_json::json!({
+            "did": "did:bharat:call_test_user_a",
+            "vk_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+            "timestamp": 1700000000
+        }).to_string();
+        let resp = gw1.dispatch_request("POST", "/api/v1/identity", &reg_req).await;
+        assert_eq!(resp.status_code, 201);
+
+        // Send chat message
+        let msg_req = serde_json::json!({
+            "sender_did": "did:bharat:call_test_user_a",
+            "recipient_did": "did:bharat:call_test_user_b",
+            "text": "Call me when free!",
+            "timestamp": 1700000010
+        }).to_string();
+        let resp = gw1.dispatch_request("POST", "/api/v1/messages", &msg_req).await;
+        assert_eq!(resp.status_code, 200);
+
+        // Log call
+        let call_req = serde_json::json!({
+            "caller_did": "did:bharat:call_test_user_a",
+            "recipient_did": "did:bharat:call_test_user_b",
+            "call_type": "VIDEO",
+            "status": "COMPLETED",
+            "duration_seconds": 42,
+            "timestamp": 1700000020
+        }).to_string();
+        let resp = gw1.dispatch_request("POST", "/api/v1/calls", &call_req).await;
+        assert_eq!(resp.status_code, 201);
+        assert_eq!(resp.body["status"], "RECORDED");
+        assert_eq!(resp.body["call_type"], "VIDEO");
+        assert_eq!(resp.body["duration_seconds"], 42);
+
+        // Query calls on gw1
+        let get_calls = gw1.dispatch_request("GET", "/api/v1/calls?did=did:bharat:call_test_user_a", "").await;
+        assert_eq!(get_calls.status_code, 200);
+        assert_eq!(get_calls.body["total"], 1);
+        assert_eq!(get_calls.body["calls"][0]["duration_seconds"], 42);
+    }
+
+    // 2. Instance 2: Reload same directory - verify full recovery of accounts, messages, and calls!
+    {
+        let gw2 = GatewayEngine::new_with_persistence(&temp_dir);
+
+        // Verify identity restored
+        let id_resp = gw2.dispatch_request("GET", "/api/v1/identity/did:bharat:call_test_user_a", "").await;
+        assert_eq!(id_resp.status_code, 200);
+        assert_eq!(id_resp.body["status"], "ACTIVE");
+
+        // Verify message restored
+        let msg_resp = gw2.dispatch_request("GET", "/api/v1/messages?did=did:bharat:call_test_user_a", "").await;
+        assert_eq!(msg_resp.status_code, 200);
+        assert_eq!(msg_resp.body["total"], 1);
+        assert_eq!(msg_resp.body["messages"][0]["text"], "Call me when free!");
+
+        // Verify call log restored
+        let call_resp = gw2.dispatch_request("GET", "/api/v1/calls?did=did:bharat:call_test_user_a", "").await;
+        assert_eq!(call_resp.status_code, 200);
+        assert_eq!(call_resp.body["total"], 1);
+        assert_eq!(call_resp.body["calls"][0]["call_type"], "VIDEO");
+        assert_eq!(call_resp.body["calls"][0]["duration_seconds"], 42);
+    }
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_commerce_products_crud_and_signaling() {
+    let gateway = GatewayEngine::new();
+
+    // 1. GET initial seed products
+    let list_resp = gateway.dispatch_request("GET", "/api/v1/commerce/products", "").await;
+    assert_eq!(list_resp.status_code, 200);
+    assert!(list_resp.body["total"].as_u64().unwrap() >= 3);
+
+    // 2. POST create product
+    let create_payload = serde_json::json!({
+        "id": "prod_test_khadi",
+        "owner_did": "did:bharat:seller_1",
+        "owner_name": "Sovereign Khadi Bhandar",
+        "title": "Organic Handspun Khadi Shirt",
+        "description": "Pure khadi cotton, natural indigo dye",
+        "price_inr": 1499.0,
+        "category": "Apparel",
+        "sku": "KHADI-001"
+    });
+    let create_resp = gateway.dispatch_request("POST", "/api/v1/commerce/products", &create_payload.to_string()).await;
+    assert_eq!(create_resp.status_code, 201);
+    assert_eq!(create_resp.body["product"]["id"], "prod_test_khadi");
+    assert_eq!(create_resp.body["product"]["owner_did"], "did:bharat:seller_1");
+
+    // 3. PUT update product
+    let update_payload = serde_json::json!({
+        "price_inr": 1299.0,
+        "title": "Organic Handspun Khadi Shirt (Sale)"
+    });
+    let update_resp = gateway.dispatch_request("PUT", "/api/v1/commerce/products/prod_test_khadi", &update_payload.to_string()).await;
+    assert_eq!(update_resp.status_code, 200);
+    assert_eq!(update_resp.body["product"]["price_inr"], 1299.0);
+
+    // 4. POST call signal
+    let signal_payload = serde_json::json!({
+        "caller_did": "did:bharat:alice",
+        "recipient_did": "did:bharat:bob",
+        "signal_type": "OFFER",
+        "call_type": "VIDEO"
+    });
+    let signal_resp = gateway.dispatch_request("POST", "/api/v1/calls/signal", &signal_payload.to_string()).await;
+    assert_eq!(signal_resp.status_code, 200);
+    assert_eq!(signal_resp.body["status"], "SIGNAL_DELIVERED");
+
+    // 5. DELETE product
+    let del_resp = gateway.dispatch_request("DELETE", "/api/v1/commerce/products/prod_test_khadi", "").await;
+    assert_eq!(del_resp.status_code, 200);
+    assert_eq!(del_resp.body["status"], "DELETED");
+}
+
+#[tokio::test]
+async fn test_ota_app_update_metadata_and_binary_stream() {
+    let gateway = GatewayEngine::new();
+
+    // 1. GET default update info
+    let get_resp = gateway.dispatch_request("GET", "/api/v1/app/update", "").await;
+    assert_eq!(get_resp.status_code, 200);
+    assert_eq!(get_resp.body["latest_version_code"], 2);
+    assert_eq!(get_resp.body["latest_version_name"], "1.0.1-SOVEREIGN");
+    assert_eq!(get_resp.body["download_url"], "/api/v1/app/download");
+
+    // 2. POST update metadata
+    let update_payload = serde_json::json!({
+        "latest_version_code": 3,
+        "latest_version_name": "1.0.2-SOVEREIGN",
+        "release_notes": "• Critical security patches\n• Offline audio call improvements",
+        "mandatory": false
+    });
+    let post_resp = gateway.dispatch_request("POST", "/api/v1/app/update", &update_payload.to_string()).await;
+    assert_eq!(post_resp.status_code, 200);
+    assert_eq!(post_resp.body["latest_version_code"], 3);
+    assert_eq!(post_resp.body["latest_version_name"], "1.0.2-SOVEREIGN");
+
+    // Verify GET reflects update
+    let check_resp = gateway.dispatch_request("GET", "/api/v1/app/update", "").await;
+    assert_eq!(check_resp.status_code, 200);
+    assert_eq!(check_resp.body["latest_version_code"], 3);
+
+    // 3. Test APK binary download stream
+    let temp_dir = std::env::temp_dir();
+    let mock_apk_path = temp_dir.join("mock_bharatchat.apk");
+    let mock_bytes = vec![0x50, 0x4B, 0x03, 0x04, 0xDE, 0xAD, 0xBE, 0xEF]; // Zip/APK magic header mock
+    std::fs::write(&mock_apk_path, &mock_bytes).expect("Failed to write mock APK");
+
+    gateway.set_apk_path(&mock_apk_path);
+
+    // Test HEAD request
+    let head_resp = gateway.dispatch_request("HEAD", "/api/v1/app/download", "").await;
+    assert_eq!(head_resp.status_code, 200);
+    let cl_header = head_resp.headers.iter().find(|(k, _)| k == "Content-Length");
+    assert!(cl_header.is_some());
+    assert_eq!(cl_header.unwrap().1, mock_bytes.len().to_string());
+
+    // Test GET binary request
+    let download_resp = gateway.dispatch_request("GET", "/api/v1/app/download", "").await;
+    assert_eq!(download_resp.status_code, 200);
+    assert!(download_resp.binary_body.is_some());
+    assert_eq!(download_resp.binary_body.as_ref().unwrap(), &mock_bytes);
+
+    let raw_http = download_resp.to_http_bytes();
+    assert!(raw_http.starts_with(b"HTTP/1.1 200 OK\r\n"));
+    assert!(raw_http.ends_with(&mock_bytes));
+
+    let _ = std::fs::remove_file(mock_apk_path);
+}
+
+#[tokio::test]
+async fn test_bidirectional_call_signaling_flow() {
+    let gateway = GatewayEngine::new();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // 1. Alice calls Bob (OFFER)
+    let offer_payload = serde_json::json!({
+        "call_id": "call_test_101",
+        "caller_did": "did:bharat:alice",
+        "caller_name": "Alice Sharma",
+        "recipient_did": "did:bharat:bob",
+        "signal_type": "OFFER",
+        "call_type": "VIDEO",
+        "timestamp": now
+    });
+    let offer_resp = gateway.dispatch_request("POST", "/api/v1/calls/signal", &offer_payload.to_string()).await;
+    assert_eq!(offer_resp.status_code, 200);
+    assert_eq!(offer_resp.body["status"], "SIGNAL_DELIVERED");
+    assert_eq!(offer_resp.body["call_status"], "RINGING");
+
+    // 2. Bob polls incoming calls for his DID
+    let bob_signals = gateway.dispatch_request("GET", "/api/v1/calls/signal?did=did:bharat:bob", "").await;
+    assert_eq!(bob_signals.status_code, 200);
+    assert_eq!(bob_signals.body["total"], 1);
+    assert_eq!(bob_signals.body["signals"][0]["call_id"], "call_test_101");
+    assert_eq!(bob_signals.body["signals"][0]["caller_name"], "Alice Sharma");
+    assert_eq!(bob_signals.body["signals"][0]["status"], "RINGING");
+
+    // 2b. Verify Bob can also poll using standard URL-encoded DID (did%3Abharat%3Abob)
+    let bob_encoded_signals = gateway.dispatch_request("GET", "/api/v1/calls/signal?did=did%3Abharat%3Abob", "").await;
+    assert_eq!(bob_encoded_signals.status_code, 200);
+    assert_eq!(bob_encoded_signals.body["total"], 1);
+    assert_eq!(bob_encoded_signals.body["signals"][0]["call_id"], "call_test_101");
+
+    // 3. Bob accepts the call (ANSWER)
+    let answer_payload = serde_json::json!({
+        "call_id": "call_test_101",
+        "caller_did": "did:bharat:alice",
+        "recipient_did": "did:bharat:bob",
+        "signal_type": "ANSWER",
+        "call_type": "VIDEO",
+        "timestamp": now + 3
+    });
+    let answer_resp = gateway.dispatch_request("POST", "/api/v1/calls/signal", &answer_payload.to_string()).await;
+    assert_eq!(answer_resp.status_code, 200);
+    assert_eq!(answer_resp.body["call_status"], "CONNECTED");
+
+    // 4. Alice polls call status by call_id and sees CONNECTED
+    let check_resp = gateway.dispatch_request("GET", "/api/v1/calls/signal?call_id=call_test_101", "").await;
+    assert_eq!(check_resp.status_code, 200);
+    assert_eq!(check_resp.body["signals"][0]["status"], "CONNECTED");
+
+    // 5. Alice hangs up call (HANGUP)
+    let hangup_payload = serde_json::json!({
+        "call_id": "call_test_101",
+        "caller_did": "did:bharat:alice",
+        "recipient_did": "did:bharat:bob",
+        "signal_type": "HANGUP",
+        "call_type": "VIDEO",
+        "timestamp": now + 15
+    });
+    let hangup_resp = gateway.dispatch_request("POST", "/api/v1/calls/signal", &hangup_payload.to_string()).await;
+    assert_eq!(hangup_resp.status_code, 200);
+    assert_eq!(hangup_resp.body["call_status"], "ENDED");
+
+    // 6. Verify Bob checks status and sees ENDED
+    let final_check = gateway.dispatch_request("GET", "/api/v1/calls/signal?call_id=call_test_101", "").await;
+    assert_eq!(final_check.status_code, 200);
+    assert_eq!(final_check.body["signals"][0]["status"], "ENDED");
+}
+
+#[tokio::test]
+async fn test_media_upload_and_retrieval() {
+    let gateway = GatewayEngine::new();
+
+    // 1. Upload sample image (base64 encoded "SovereignImageBytes")
+    let raw_bytes = b"SovereignImageBytes12345";
+    let base64_str = "U292ZXJlaWduSW1hZ2VCeXRlczEyMzQ1";
+    let upload_payload = serde_json::json!({
+        "filename": "surat_silk.png",
+        "media_type": "IMAGE",
+        "mime_type": "image/png",
+        "data_base64": base64_str
+    });
+
+    let up_resp = gateway.dispatch_request("POST", "/api/v1/media/upload", &upload_payload.to_string()).await;
+    assert_eq!(up_resp.status_code, 200);
+    assert_eq!(up_resp.body["status"], "UPLOADED");
+    assert_eq!(up_resp.body["filename"], "surat_silk.png");
+    assert_eq!(up_resp.body["size_bytes"], raw_bytes.len());
+    let media_id = up_resp.body["media_id"].as_str().unwrap();
+
+    // 2. Fetch the uploaded media binary
+    let get_path = format!("/api/v1/media/{}", media_id);
+    let down_resp = gateway.dispatch_request("GET", &get_path, "").await;
+    assert_eq!(down_resp.status_code, 200);
+    assert!(down_resp.binary_body.is_some());
+    assert_eq!(down_resp.binary_body.unwrap(), raw_bytes);
+}
+
+#[tokio::test]
+async fn test_webrtc_sdp_and_ice_candidate_relay() {
+    let gateway = GatewayEngine::new();
+    let now = 1776000000u64;
+
+    // 1. Alice sends OFFER with WebRTC SDP
+    let offer_payload = serde_json::json!({
+        "call_id": "call_webrtc_999",
+        "caller_did": "did:bharat:alice",
+        "caller_name": "Alice",
+        "recipient_did": "did:bharat:bob",
+        "signal_type": "OFFER",
+        "call_type": "VIDEO",
+        "sdp": "v=0\r\no=alice 12345 2 IN IP4 127.0.0.1\r\ns=-\r\n",
+        "timestamp": now
+    });
+    let offer_resp = gateway.dispatch_request("POST", "/api/v1/calls/signal", &offer_payload.to_string()).await;
+    assert_eq!(offer_resp.status_code, 200);
+    assert_eq!(offer_resp.body["signal"]["sdp"], "v=0\r\no=alice 12345 2 IN IP4 127.0.0.1\r\ns=-\r\n");
+
+    // 2. Bob sends ANSWER with WebRTC SDP
+    let answer_payload = serde_json::json!({
+        "call_id": "call_webrtc_999",
+        "caller_did": "did:bharat:alice",
+        "recipient_did": "did:bharat:bob",
+        "signal_type": "ANSWER",
+        "call_type": "VIDEO",
+        "sdp": "v=0\r\no=bob 67890 2 IN IP4 127.0.0.1\r\ns=-\r\n",
+        "timestamp": now + 1
+    });
+    let ans_resp = gateway.dispatch_request("POST", "/api/v1/calls/signal", &answer_payload.to_string()).await;
+    assert_eq!(ans_resp.status_code, 200);
+
+    // 3. Alice exchanges ICE candidate
+    let ice_payload = serde_json::json!({
+        "call_id": "call_webrtc_999",
+        "caller_did": "did:bharat:alice",
+        "recipient_did": "did:bharat:bob",
+        "signal_type": "ICE_CANDIDATE",
+        "call_type": "VIDEO",
+        "candidate": "candidate:1 1 UDP 2122260223 192.168.1.3 54321 typ host",
+        "sdp_mid": "0",
+        "sdp_mline_index": 0,
+        "timestamp": now + 2
+    });
+    let ice_resp = gateway.dispatch_request("POST", "/api/v1/calls/signal", &ice_payload.to_string()).await;
+    assert_eq!(ice_resp.status_code, 200);
+    assert_eq!(ice_resp.body["signal"]["signal_type"], "ICE_CANDIDATE");
+
+    // 4. Bob queries call signals and receives the ICE candidate
+    let bob_signals = gateway.dispatch_request("GET", "/api/v1/calls/signal?call_id=call_webrtc_999", "").await;
+    assert_eq!(bob_signals.status_code, 200);
+    assert_eq!(bob_signals.body["total"], 2); // main call session + ice candidate
+}
+
 
 

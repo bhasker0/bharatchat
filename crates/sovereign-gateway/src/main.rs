@@ -18,7 +18,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  DPDP Act 2023 & IT Rules 2021 Rule 4(2): ACTIVE");
     println!("============================================================");
 
-    let gateway = Arc::new(GatewayEngine::new());
+    let persist_path = std::env::var("SOVEREIGN_PERSISTENCE_DIR")
+        .unwrap_or_else(|_| "data/persistence".to_string());
+    println!("  Data Persistence Storage: {}", persist_path);
+    let gateway = Arc::new(GatewayEngine::new_with_persistence(&persist_path));
 
     loop {
         let (mut socket, peer_addr) = match listener.accept().await {
@@ -149,12 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("[REQ] peer={} method={} path={}", peer_addr, method, path);
 
                     let response = if method == "OPTIONS" {
-                        HttpResponse {
-                            status_code: 204,
-                            headers: vec![],
-                            body: serde_json::Value::Null,
-                            raw_body: None,
-                        }
+                        HttpResponse::no_content()
                     } else {
                         gw.dispatch_request(method, path, &body).await
                     };

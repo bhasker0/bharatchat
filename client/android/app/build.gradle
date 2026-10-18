@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "in.bharatchat.app"
-    compileSdk 34
+    compileSdk 35
     ndkVersion "25.1.8937393"
 
     compileOptions {
@@ -44,7 +44,7 @@ android {
     defaultConfig {
         applicationId "in.bharatchat.app"
         minSdk 24
-        targetSdk 34
+        targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
 
